@@ -1,0 +1,7 @@
+# 로컬 개발용. `cp .dev.vars.example .dev.vars` 후 사용
+IP_SALT=local-dev-salt-change-me
+ADMIN_TOKEN=local-admin-token
+ALLOWED_ORIGINS=
+# 테스트용: 자동 삭제 대기 시간(ms, 기본 30일), 시계 이동(ms)
+# AUTO_DELETE_AFTER_MS=5000
+# CLOCK_OFFSET_MS=0

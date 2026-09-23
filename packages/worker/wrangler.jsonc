@@ -1,0 +1,33 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "deulleotdagam-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "RoomDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomDO"] }],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "deulleotdagam-index",
+      // 배포 전: `npx wrangler d1 create deulleotdagam-index`로 만든 id로 바꿀 것
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // 매일 00:00 UTC(한국 09:00, 무료 한도 초기화 시각): 지난 생성 횟수 기록 정리
+  "triggers": { "crons": ["0 0 * * *"] },
+  "vars": {
+    // 쉼표로 구분. 배포할 Pages 주소를 넣을 것 (비우면 모든 출처 허용)
+    "ALLOWED_ORIGINS": "https://deulleotdagam.pages.dev",
+    // TODO(open-question #9): IP 해시당 하루 방 생성 5개 (임시안)
+    "CREATE_LIMIT_PER_DAY": "5",
+    // TODO(open-question #7): 서로 다른 신고자 3명이면 비활성 전환 (임시안)
+    "REPORT_THRESHOLD": "3",
+    // TODO(open-question #8): 기본 금칙어에 더할 단어 (쉼표 구분)
+    "BANNED_WORDS": ""
+  }
+  // 비밀값(대시보드 또는 `wrangler secret put`): IP_SALT(필수), ADMIN_TOKEN(관리자 API용)
+}

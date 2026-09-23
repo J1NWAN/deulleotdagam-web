@@ -1,0 +1,19 @@
+{
+  "name": "@deulleotdagam/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview --port 4173",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@deulleotdagam/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "vite": "^8.3.0"
+  }
+}

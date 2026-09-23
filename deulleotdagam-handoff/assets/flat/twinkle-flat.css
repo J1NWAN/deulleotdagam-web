@@ -1,0 +1,15 @@
+/* 플랫 트윙클 — SVG를 인라인으로 삽입하면 동작합니다 */
+@keyframes fl-fade{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes fl-soft{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes fl-pop{0%,100%{opacity:0;transform:scale(.2)}50%{opacity:1;transform:scale(1)}}
+@keyframes fl-shine{0%,70%,100%{opacity:.3}80%{opacity:1}}
+@keyframes fl-spin{to{transform:rotate(360deg)}}
+.fl-glow{animation:fl-fade 1.6s ease-in-out infinite}
+.fl-bulb{animation:fl-soft 1.6s ease-in-out infinite}
+.fl-fairy{animation:fl-fade 2.4s ease-in-out infinite}
+.fl-halo{animation:fl-soft 2s ease-in-out infinite}
+.fl-sparkle{transform-box:fill-box;transform-origin:center;animation:fl-pop 1.8s ease-in-out infinite}
+.fl-shimmer{animation:fl-shine 2.7s linear infinite}
+.fl-spin{transform-box:fill-box;transform-origin:center;animation:fl-spin 18s linear infinite}
+.fl-paused *{animation-play-state:paused!important}
+@media (prefers-reduced-motion:reduce){.fl-glow,.fl-bulb,.fl-fairy,.fl-halo,.fl-sparkle,.fl-shimmer,.fl-spin{animation:none}}

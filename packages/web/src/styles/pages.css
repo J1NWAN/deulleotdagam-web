@@ -1,0 +1,55 @@
+/* 메인 / 지난 시즌 / 안내 페이지 */
+.page{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.page-top{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--paper);border-bottom:3px solid var(--ink)}
+.page-top a.brand{font-weight:700;text-decoration:none}
+.page-top .sub{color:var(--ink-soft);font-size:.9rem}
+
+.hero{position:relative;overflow:hidden;background:repeating-linear-gradient(90deg,var(--wall) 0 22px,var(--wall-line) 22px 26px);
+  border-bottom:3px solid var(--ink);display:grid;grid-template-columns:1.1fr 1fr;align-items:end;gap:12px;padding:28px 6vw 0;min-height:340px}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46px;
+  background:repeating-linear-gradient(90deg,var(--floor) 0 90px,var(--floor-line) 90px 94px);border-top:4px solid var(--floor-line)}
+.hero-text{position:relative;z-index:1;align-self:center;padding-bottom:56px}
+.hero h1{font-size:clamp(2.2rem,6vw,3.4rem);margin:0;letter-spacing:-.02em}
+.hero h1 small{display:block;font-size:.38em;font-weight:400;color:var(--ink-soft);letter-spacing:0;margin-top:6px}
+.hero p{font-size:1.05rem;line-height:1.7;margin:16px 0 0;max-width:30em}
+.hero .season{display:inline-block;margin-top:14px;font-size:.85rem;padding:4px 10px;border:2px solid var(--ink);background:var(--paper)}
+.hero-art{position:relative;z-index:1;display:flex;justify-content:center;align-items:flex-end}
+.hero-art svg{width:min(300px,70%);height:auto;display:block;margin-bottom:28px}
+
+.main{flex:1;width:min(1080px,100%);margin:0 auto;padding:28px 18px 40px}
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:18px}
+.panel{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);padding:18px;display:flex;flex-direction:column;gap:10px}
+.panel h2{margin:0;font-size:1.08rem}
+.panel p{margin:0;font-size:.9rem;color:var(--ink-soft);line-height:1.55}
+.panel form{display:flex;flex-direction:column;gap:10px}
+.panel .inline,.panel form.inline{display:flex;flex-direction:row;gap:8px}
+.panel .inline input{flex:1;min-width:0}
+.panel.featured{grid-row:span 2}
+.panel .seg{align-self:flex-start}
+.recent{margin-top:28px}
+.recent h2{font-size:1rem;margin:0 0 10px}
+.recent ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.recent a{display:inline-flex;gap:8px;align-items:center;text-decoration:none;border:2px solid var(--ink);background:var(--panel);padding:6px 10px;font-size:.88rem}
+.recent a .role{font-size:.72rem;padding:1px 6px;background:var(--holly);color:#fff8ef}
+.foot{padding:16px 18px;font-size:.82rem;color:var(--ink-soft);display:flex;gap:14px;flex-wrap:wrap;justify-content:center;border-top:2px solid var(--panel-line)}
+
+/* 지난 시즌 */
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px;margin-top:18px}
+.gcard{background:var(--paper);border:3px solid var(--ink);box-shadow:5px 5px 0 var(--ink);text-decoration:none;display:flex;flex-direction:column}
+.gcard .thumb{aspect-ratio:3/2;background:var(--wall);border-bottom:3px solid var(--ink);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.gcard .thumb svg{width:100%;height:100%;display:block}
+.gcard .meta{padding:10px 12px;display:flex;align-items:center;gap:8px;justify-content:space-between}
+.gcard .meta b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.empty-state{margin-top:24px;text-align:center;padding:40px 16px;border:3px dashed var(--panel-line);background:var(--panel)}
+.empty-state p{margin:8px 0 0;color:var(--ink-soft)}
+.empty-state svg{width:96px;height:auto}
+
+.doc{background:var(--paper);border:3px solid var(--ink);padding:24px;line-height:1.7}
+.doc h1{margin-top:0;font-size:1.4rem}
+
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr;padding:22px 18px 0;min-height:0}
+  .hero-text{padding-bottom:0}
+  .hero-art svg{width:180px;margin-bottom:40px}
+  .panel.featured{grid-row:auto}
+}

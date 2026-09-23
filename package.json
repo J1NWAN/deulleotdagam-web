@@ -1,0 +1,21 @@
+{
+  "name": "deulleotdagam",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "packages/worker",
+    "packages/web"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:worker": "npm run dev -w @deulleotdagam/worker",
+    "dev:web": "npm run dev -w @deulleotdagam/web",
+    "build": "npm run build -w @deulleotdagam/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @deulleotdagam/shared",
+    "test:e2e": "npm run test:e2e -w @deulleotdagam/worker"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

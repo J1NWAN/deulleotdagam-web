@@ -1,0 +1,14 @@
+/* 픽셀 트윙클 — SVG를 인라인으로 삽입하면 동작합니다 */
+@keyframes px-blink{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes px-glow{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes px-pop{0%,60%,100%{opacity:0}70%,90%{opacity:1}}
+@keyframes px-shine{0%,80%,100%{opacity:.4}88%{opacity:1}}
+.px-bulb{animation:px-blink 1.6s steps(2,jump-none) infinite}
+.px-glow{animation:px-glow 1.6s steps(3,jump-none) infinite}
+.px-fairy{animation:px-blink 2.2s steps(3,jump-none) infinite}
+.px-sparkle{animation:px-pop 2s steps(1,end) infinite}
+.px-shimmer{animation:px-shine 2.4s steps(1,end) infinite}
+.px-glint{animation:px-shine 3s steps(1,end) infinite}
+.px-d0{animation-delay:0s}.px-d1{animation-delay:-.4s}.px-d2{animation-delay:-.8s}.px-d3{animation-delay:-1.2s}
+.px-paused *{animation-play-state:paused!important}
+@media (prefers-reduced-motion:reduce){.px-bulb,.px-glow,.px-fairy,.px-sparkle,.px-shimmer,.px-glint{animation:none}}

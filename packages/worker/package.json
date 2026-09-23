@@ -1,0 +1,21 @@
+{
+  "name": "@deulleotdagam/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply deulleotdagam-index --local",
+    "db:migrate:remote": "wrangler d1 migrations apply deulleotdagam-index --remote",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json",
+    "test:e2e": "node --test test/"
+  },
+  "dependencies": {
+    "@deulleotdagam/shared": "*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260923.1",
+    "wrangler": "^4.136.3"
+  }
+}
