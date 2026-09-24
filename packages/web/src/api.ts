@@ -36,7 +36,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   season: () => call<SeasonInfo>('GET', '/api/season'),
-  createRoom: (title: string, visibility: Visibility) => call<CreateRoomResponse>('POST', '/api/rooms', { title, visibility }),
+  createRoom: (title: string, visibility: Visibility, background: string) => call<CreateRoomResponse>('POST', '/api/rooms', { title, visibility, background }),
   join: (code: string) => call<JoinResponse>('GET', `/api/join/${encodeURIComponent(code)}`),
   resume: (ownerKey: string) => call<JoinResponse>('POST', '/api/owner/resume', { ownerKey }),
   randomPublic: (exclude?: string) => call<{ joinCode: string; title: string }>('GET', `/api/rooms/random-public${exclude ? `?exclude=${exclude}` : ''}`),

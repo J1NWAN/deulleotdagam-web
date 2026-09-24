@@ -59,3 +59,7 @@ export function isValidItem(theme: ThemeGeometry, itemId: unknown): itemId is st
 export function isValidString(theme: ThemeGeometry, stringId: unknown): stringId is string {
   return typeof stringId === 'string' && theme.strings.some(s => s.id === stringId);
 }
+
+export function isValidBackground(theme: ThemeGeometry, id: unknown): id is string {
+  return typeof id === 'string' && theme.backgrounds.some(b => b.id === id);
+}

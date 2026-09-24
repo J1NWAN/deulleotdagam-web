@@ -281,6 +281,30 @@ describe('방장 기능', () => {
   });
 });
 
+describe('배경', () => {
+  it('방 만들 때 배경 선택: 기본값 / 고른 값 / 목록 밖 값은 거부', async () => {
+    const d = await createRoom('기본 배경');
+    assert.equal((await open(d.roomId).hello()).snapshot.background, 'living-room');
+    const r = await api('POST', '/api/rooms', { title: '오로라 방', background: 'aurora' });
+    assert.equal(r.status, 201);
+    assert.equal((await open(r.data.roomId).hello()).snapshot.background, 'aurora');
+    const bad = await api('POST', '/api/rooms', { title: '이상한 배경', background: '../etc' });
+    assert.equal(bad.status, 400);
+  });
+
+  it('배경 바꾸기: 방장만, 목록 안의 값만, 모두에게 알림', async () => {
+    const r = await createRoom('배경 바꾸기');
+    const owner = open(r.roomId), g = open(r.roomId);
+    await owner.hello({ ownerKey: r.ownerKey }); await g.hello();
+    assert.equal((await g.request({ t: 'setBackground', background: 'village' }, 'backgroundChanged')).code, 'NOT_ALLOWED');
+    assert.equal((await owner.request({ t: 'setBackground', background: 'beach' }, 'backgroundChanged')).code, 'INVALID_ITEM');
+    const seen = g.next('backgroundChanged');
+    assert.equal((await owner.request({ t: 'setBackground', background: 'village' }, 'backgroundChanged')).background, 'village');
+    assert.equal((await seen).background, 'village');
+    assert.equal((await open(r.roomId).hello()).snapshot.background, 'village');
+  });
+});
+
 describe('신고 / 비활성 / 관리자', () => {
   it('서로 다른 신고자(IP) 3명이 모이면 비활성 → 입장 불가 → 관리자 복구', async () => {
     const r = await createRoom('신고 테스트');

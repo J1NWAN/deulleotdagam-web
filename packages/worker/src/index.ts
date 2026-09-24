@@ -1,5 +1,5 @@
 import {
-  checkTitle, currentSeason, hashIp, hashOwnerKey, isJoinCode, isOwnerKey, isRoomId, lastEndedSeason, newJoinCode,
+  checkTitle, currentSeason, getTheme, hashIp, isValidBackground, hashOwnerKey, isJoinCode, isOwnerKey, isRoomId, lastEndedSeason, newJoinCode,
   newOwnerKey, newRoomId, normalizeCode, seasonById, isSeasonOver,
   type ApiError, type ApiErrorCode, type ArchiveResponse, type ArchiveRoom, type CreateRoomResponse, type JoinResponse,
   type RoomStatus, type SeasonInfo, type Visibility,
@@ -70,13 +70,16 @@ function seasonInfo(env: Env): SeasonInfo {
 }
 
 async function createRoom(request: Request, env: Env): Promise<Response> {
-  const input = await body<{ title: string; visibility: Visibility }>(request);
+  const input = await body<{ title: string; visibility: Visibility; background: string }>(request);
   const season = currentSeason(now(env));
   if (!season) throw new HttpError(409, 'NO_SEASON', '지금은 시즌이 쉬는 중이라 방을 만들 수 없어요');
   const title = checkTitle(input.title ?? season.defaultTitle, bannedWords(env));
   if (!title.ok) throw new HttpError(400, 'TITLE_REJECTED',
     title.reason === 'EMPTY' ? '방 이름을 입력해 주세요' : title.reason === 'TOO_LONG' ? '방 이름은 20자까지 쓸 수 있어요' : '방 이름에 쓸 수 없는 말이 들어 있어요');
   const visibility: Visibility = input.visibility === 'public' ? 'public' : 'private';
+  const theme = getTheme(season.themeId);
+  const background = input.background ?? theme.defaultBackground;
+  if (!isValidBackground(theme, background)) throw new HttpError(400, 'BAD_REQUEST', '고를 수 없는 배경이에요');
 
   // 생성 횟수 제한: IP는 솔트 해시로만 다룬다
   const day = new Date().toISOString().slice(0, 10);
@@ -105,7 +108,7 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
   }
   if (!joinCode) throw new HttpError(500, 'INTERNAL', '참여 코드를 만들지 못했어요. 다시 시도해 주세요');
   try {
-    await roomStub(env, roomId).init({ roomId, title: title.value, visibility, seasonId: season.id, themeId: season.themeId, joinCode, ownerKeyHash });
+    await roomStub(env, roomId).init({ roomId, title: title.value, visibility, seasonId: season.id, themeId: season.themeId, joinCode, ownerKeyHash, background });
   } catch (err) {
     await env.DB.prepare(`DELETE FROM rooms_index WHERE room_id = ?`).bind(roomId).run();
     throw err;

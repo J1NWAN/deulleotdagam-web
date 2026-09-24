@@ -45,3 +45,24 @@ const THEMES: Record<string, ThemeAssets> = {
 export function themeAssets(id: string): ThemeAssets {
   return THEMES[id] ?? THEMES.pixel;
 }
+
+// ---------- 배경 ----------
+// 배경 그림은 개당 150~230KB라 번들에 넣지 않고 public/backgrounds에서 고른 것만 불러온다.
+// 반짝임 애니메이션(px- 클래스)이 동작하도록 받아서 인라인으로 넣는다.
+
+export const backgroundUrl = (id: string) => `/backgrounds/bg-${id}.svg`;
+
+const bgCache = new Map<string, Promise<SvgAsset>>();
+
+export function loadBackground(id: string): Promise<SvgAsset> {
+  let p = bgCache.get(id);
+  if (!p) {
+    p = fetch(backgroundUrl(id)).then(r => {
+      if (!r.ok) throw new Error(`background ${id}: ${r.status}`);
+      return r.text();
+    }).then(parseSvg);
+    p.catch(() => bgCache.delete(id));
+    bgCache.set(id, p);
+  }
+  return p;
+}

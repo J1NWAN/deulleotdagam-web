@@ -1,5 +1,5 @@
 import type { Band, Placement, RoomSnapshot, TreeSnapshot } from '@deulleotdagam/shared';
-import type { ThemeAssets } from '../theme';
+import { backgroundUrl, type SvgAsset, type ThemeAssets } from '../theme';
 
 export const esc = (t: unknown) => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -50,7 +50,7 @@ export function treeWithOrnamentsInner(theme: ThemeAssets, tree: TreeSnapshot, p
  * 방 전체(나무 3그루)를 한 장의 SVG로. 벽지/바닥 배경 포함.
  * width×height 픽셀 기준 좌표를 쓰므로 canvas에 그대로 그릴 수 있다.
  */
-export function forestSvg(theme: ThemeAssets, snap: Pick<RoomSnapshot, 'trees' | 'placements'>, width: number, height: number, opts: { background?: boolean; colors?: { wall: string; wallLine: string; floor: string; floorLine: string } } = {}): string {
+export function forestSvg(theme: ThemeAssets, snap: Pick<RoomSnapshot, 'trees' | 'placements'>, width: number, height: number, opts: { background?: boolean; backgroundSvg?: SvgAsset | null; colors?: { wall: string; wallLine: string; floor: string; floorLine: string } } = {}): string {
   const g = theme.geometry;
   const [vx, vy, vw, vh] = g.stageViewBox;
   const floorH = height * 0.13;
@@ -71,7 +71,9 @@ export function forestSvg(theme: ThemeAssets, snap: Pick<RoomSnapshot, 'trees' |
     return svg;
   }).join('');
   const c = opts.colors ?? { wall: '#d9c2c6', wallLine: '#cfb5ba', floor: '#9a6a4c', floorLine: '#875b40' };
-  const bg = opts.background === false ? '' : `
+  const bg = opts.background === false ? '' : opts.backgroundSvg
+    ? `<svg width="${width}" height="${height}" viewBox="${opts.backgroundSvg.viewBox}" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges">${opts.backgroundSvg.inner}</svg>`
+    : `
     <defs>
       <pattern id="wp" width="26" height="10" patternUnits="userSpaceOnUse"><rect width="22" height="10" fill="${c.wall}"/><rect x="22" width="4" height="10" fill="${c.wallLine}"/></pattern>
       <pattern id="fp" width="94" height="10" patternUnits="userSpaceOnUse"><rect width="90" height="10" fill="${c.floor}"/><rect x="90" width="4" height="10" fill="${c.floorLine}"/></pattern>
@@ -80,4 +82,12 @@ export function forestSvg(theme: ThemeAssets, snap: Pick<RoomSnapshot, 'trees' |
     <rect y="${height - floorH}" width="${width}" height="${floorH}" fill="url(#fp)"/>
     <rect y="${height - floorH}" width="${width}" height="4" fill="${c.floorLine}"/>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" shape-rendering="crispEdges" aria-hidden="true">${bg}${parts}</svg>`;
+}
+
+/** 배경 고르기 버튼 목록 (방 만들기, 배경 바꾸기 공용) */
+export function backgroundPickerHtml(theme: ThemeAssets, selected: string): string {
+  return theme.geometry.backgrounds.map(b => `
+    <button type="button" class="bg-opt" data-bg="${b.id}" aria-pressed="${b.id === selected}">
+      <img src="${backgroundUrl(b.id)}" alt="" loading="lazy" decoding="async"><span>${esc(b.name)}</span>
+    </button>`).join('');
 }

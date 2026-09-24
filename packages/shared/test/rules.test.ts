@@ -1,8 +1,9 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   accepts, canDelete, checkMemo, checkName, checkTitle, containsBanned,
   CODE_ALPHABET, currentSeason, formatKey, hashOwnerKey, isJoinCode, isOwnerKey, isRoomId, isSeasonOver,
-  isValidItem, isValidString, lastEndedSeason, newJoinCode, newOwnerKey, newRoomId, normalizeCode, PIXEL_THEME, SEASONS,
+  isValidBackground, isValidItem, isValidString, lastEndedSeason, newJoinCode, newOwnerKey, newRoomId, normalizeCode, PIXEL_THEME, SEASONS,
 } from '../src';
 
 const T = PIXEL_THEME;
@@ -99,5 +100,23 @@ describe('시즌', () => {
   it('크리스마스 시즌은 KST 12/1 ~ 12/31', () => {
     expect(new Date(s.startsAt).toISOString()).toBe('2026-11-30T15:00:00.000Z');
     expect(new Date(s.endsAt).toISOString()).toBe('2026-12-31T15:00:00.000Z');
+  });
+});
+
+describe('배경', () => {
+  it('기본 배경은 목록에 있고, 목록 밖의 값은 거부', () => {
+    expect(isValidBackground(T, T.defaultBackground)).toBe(true);
+    expect(isValidBackground(T, 'aurora')).toBe(true);
+    expect(isValidBackground(T, 'beach')).toBe(false);
+    expect(isValidBackground(T, null)).toBe(false);
+  });
+  it('모든 배경 그림 파일이 있고 메타데이터(C2PA)가 제거돼 있다', () => {
+    for (const b of T.backgrounds) {
+      const url = new URL(`../../web/public/backgrounds/bg-${b.id}.svg`, import.meta.url);
+      expect(existsSync(url), b.id).toBe(true);
+      const svg = readFileSync(url, 'utf8');
+      expect(svg).toMatch(/viewBox="0 0 160 90"/);
+      expect(svg).not.toMatch(/c2pa|<metadata/);
+    }
   });
 });

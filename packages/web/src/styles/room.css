@@ -21,6 +21,11 @@
 .stage::after{content:"";position:absolute;left:0;right:0;bottom:0;height:13%;
   background:repeating-linear-gradient(90deg,var(--floor) 0 90px,var(--floor-line) 90px 94px);
   border-top:4px solid var(--floor-line);z-index:0}
+/* 방 배경 그림: 바닥이 늘 보이도록 아래쪽 기준으로 채운다 */
+.stage-bg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.stage-bg svg{width:100%;height:100%;display:block}
+.stage.has-bg{background:#1b1320}
+.stage.has-bg::after{display:none}
 .forest{position:relative;z-index:1;width:100%;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:1%;padding:0 1.5% 1.5%}
 .tree-col{position:relative;display:flex;flex-direction:column;align-items:center;flex:none;
   --h:calc(100cqh - 64px); width:min(31.5cqw, calc(var(--h) * 48 / 68))}
@@ -102,6 +107,16 @@
 .tree-tabs button{flex:1;font-size:.85rem;padding:6px 4px}
 .share-preview{border:2px solid var(--ink);background:var(--wall);min-height:180px;display:flex;align-items:center;justify-content:center}
 .share-preview img{display:block;width:100%;height:auto}
+.bg-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:6px}
+.bg-opts.sm{grid-template-columns:repeat(3,1fr);gap:6px}
+.bg-opt{border:2px solid var(--panel-line);background:var(--panel);padding:3px;display:flex;flex-direction:column;gap:3px;min-width:0;font-size:.72rem;color:var(--ink-soft)}
+.bg-opt img{width:100%;aspect-ratio:16/9;object-fit:cover;object-position:center bottom;display:block;image-rendering:pixelated}
+.bg-opt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bg-opt:hover{border-color:var(--ink)}
+.bg-opt[aria-pressed="true"]{border-color:var(--ink);box-shadow:2px 2px 0 var(--ink);color:var(--ink);outline:2px solid var(--gold-hi);outline-offset:-5px}
+.bg-field{border:0;padding:0;margin:0;min-width:0}
+.bg-field legend{padding:0;font-size:.88rem;margin-bottom:2px}
+.bg-field legend small{color:var(--ink-soft)}
 .toggle{display:flex;align-items:center;gap:8px;margin:12px 0 0;font-size:.92rem}
 .toggle input{width:18px;height:18px}
 

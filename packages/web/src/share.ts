@@ -2,7 +2,7 @@
 // TODO(open-question #11): 공유 형태 미정. 클라이언트 PNG 생성 + 메모 포함 토글 (임시안)
 import { itemName, seasonById, type RoomSnapshot } from '@deulleotdagam/shared';
 import { forestSvg } from './render/scene';
-import type { ThemeAssets } from './theme';
+import { loadBackground, type ThemeAssets } from './theme';
 import { $, closeDialog, openDialog, toast } from './ui/dom';
 
 const W = 1200;
@@ -60,7 +60,8 @@ export async function renderShareImage(theme: ThemeAssets, snap: RoomSnapshot, n
   ctx.fillText(badge, W - PAD - bw + 14, 72);
 
   // 나무 세 그루
-  const scene = await loadImage(forestSvg(theme, snap, W, SCENE_H));
+  const bg = await loadBackground(snap.background).catch(() => null);
+  const scene = await loadImage(forestSvg(theme, snap, W, SCENE_H, { backgroundSvg: bg }));
   ctx.drawImage(scene, 0, HEAD_H);
   ctx.fillStyle = COLORS.ink;
   ctx.fillRect(0, HEAD_H - 3, W, 3);

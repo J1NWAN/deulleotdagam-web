@@ -31,6 +31,7 @@ export interface RoomSnapshot {
   visibility: Visibility;
   status: RoomStatus;
   joinCode: string;
+  background: string;
   trees: TreeSnapshot[];
   placements: Placement[];
   /** guestId → 표시 이름 (장식 작성자 + 방장 + 나) */
@@ -49,6 +50,7 @@ export type C2S =
   | { t: 'remove'; treeId: string; slotId: string }
   | { t: 'setBand'; treeId: string; bandId: string; stringId: string | null }
   | { t: 'setVisibility'; visibility: Visibility }
+  | { t: 'setBackground'; background: string }
   | { t: 'setName'; name: string }
   | { t: 'deleteRoom'; confirm: string }
   | { t: 'report'; target: ReportTarget; reason?: string }
@@ -64,6 +66,7 @@ export type S2C =
   | { t: 'removed'; rev: number; treeId: string; slotId: string }
   | { t: 'bandChanged'; rev: number; treeId: string; bandId: string; stringId: string | null }
   | { t: 'roomChanged'; rev: number; visibility: Visibility; status: RoomStatus }
+  | { t: 'backgroundChanged'; rev: number; background: string }
   | { t: 'guestChanged'; rev: number; guestId: string; name: string }
   | { t: 'reported' }
   | { t: 'roomDeleted'; reason: 'owner' | 'expired' | 'admin' }
@@ -72,7 +75,7 @@ export type S2C =
 
 // ---- HTTP ----
 
-export interface CreateRoomRequest { title: string; visibility: Visibility }
+export interface CreateRoomRequest { title: string; visibility: Visibility; background?: string }
 export interface CreateRoomResponse { roomId: string; joinCode: string; ownerKey: string }
 export interface JoinResponse { roomId: string; joinCode: string; title: string; status: RoomStatus }
 export interface ArchiveRoom { roomId: string; title: string; isComplete: boolean }

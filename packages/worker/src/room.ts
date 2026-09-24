@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   accepts, autoName, canDelete, checkMemo, checkName, generateLayout, getTheme, hashGuestToken, hashOwnerKey, isSeasonOver,
-  isValidItem, isValidString, newGuestId, newGuestToken, OWNER_DEFAULT_NAME,
+  isValidBackground, isValidItem, isValidString, newGuestId, newGuestToken, OWNER_DEFAULT_NAME,
   type C2S, type ErrorCode, type Placement, type RoomSnapshot, type RoomStatus, type S2C, type Slot,
   type TreeSnapshot, type Visibility,
 } from '@deulleotdagam/shared';
@@ -15,12 +15,14 @@ export interface InitParams {
   themeId: string;
   joinCode: string;
   ownerKeyHash: string;
+  background: string;
 }
 
 interface RoomRow {
   id: string; season_id: string; theme_id: string; visibility: Visibility; status: RoomStatus;
   join_code: string; owner_key_hash: string; owner_guest_id: string; title: string; seed: number;
   created_at: number; last_activity_at: number; completed_at: number | null; is_complete: number; rev: number;
+  background: string | null;
 }
 
 /** 소켓마다 hibernation 이후에도 남는 정보 (serializeAttachment) */
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS room (
   id TEXT PRIMARY KEY, season_id TEXT NOT NULL, theme_id TEXT NOT NULL, visibility TEXT NOT NULL, status TEXT NOT NULL,
   join_code TEXT NOT NULL, owner_key_hash TEXT NOT NULL, owner_guest_id TEXT NOT NULL, title TEXT NOT NULL, seed INTEGER NOT NULL,
   created_at INTEGER NOT NULL, last_activity_at INTEGER NOT NULL, completed_at INTEGER,
-  is_complete INTEGER NOT NULL DEFAULT 0, rev INTEGER NOT NULL DEFAULT 0
+  is_complete INTEGER NOT NULL DEFAULT 0, rev INTEGER NOT NULL DEFAULT 0, background TEXT
 );
 CREATE TABLE IF NOT EXISTS tree (tree_id TEXT PRIMARY KEY, position INTEGER NOT NULL, scale REAL NOT NULL, name TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS slot (
@@ -72,6 +74,9 @@ export class RoomDO extends DurableObject<Env> {
   private room(): RoomRow | null {
     if (this.cached !== undefined) return this.cached;
     const hasTable = this.sql.exec(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='room'`).toArray().length > 0;
+    // 배경 기능 이전에 만든 방은 컬럼을 추가한다 (NULL = 테마 기본 배경)
+    if (hasTable && !this.sql.exec(`SELECT 1 FROM pragma_table_info('room') WHERE name = 'background'`).toArray().length)
+      this.sql.exec(`ALTER TABLE room ADD COLUMN background TEXT`);
     this.cached = hasTable ? (this.sql.exec<RoomRow & Record<string, SqlStorageValue>>(`SELECT * FROM room LIMIT 1`).toArray()[0] ?? null) : null;
     return this.cached;
   }
@@ -108,9 +113,9 @@ export class RoomDO extends DurableObject<Env> {
     this.ctx.storage.transactionSync(() => {
       this.sql.exec(SCHEMA);
       this.sql.exec(
-        `INSERT INTO room (id, season_id, theme_id, visibility, status, join_code, owner_key_hash, owner_guest_id, title, seed, created_at, last_activity_at)
-         VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
-        p.roomId, p.seasonId, p.themeId, p.visibility, p.joinCode, p.ownerKeyHash, ownerGuestId, p.title, seed, t, t,
+        `INSERT INTO room (id, season_id, theme_id, visibility, status, join_code, owner_key_hash, owner_guest_id, title, seed, created_at, last_activity_at, background)
+         VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)`,
+        p.roomId, p.seasonId, p.themeId, p.visibility, p.joinCode, p.ownerKeyHash, ownerGuestId, p.title, seed, t, t, p.background,
       );
       // 방장 게스트는 토큰이 아니라 방장 키로만 인식하므로 쓸 수 없는 토큰 해시를 넣어 둔다
       this.sql.exec(`INSERT INTO guest (guest_id, token_hash, display_name, created_at) VALUES (?, ?, ?, ?)`,
@@ -323,6 +328,14 @@ export class RoomDO extends DurableObject<Env> {
         this.broadcast({ t: 'roomChanged', rev, visibility: msg.visibility, status: r.status });
         return;
       }
+      case 'setBackground': {
+        if (!who.isOwner) return this.fail(ws, 'NOT_ALLOWED', '배경은 방장만 바꿀 수 있어요');
+        if (!isValidBackground(theme, msg.background)) return this.fail(ws, 'INVALID_ITEM');
+        this.sql.exec(`UPDATE room SET background = ?`, msg.background);
+        const rev = this.bumpRev();
+        this.broadcast({ t: 'backgroundChanged', rev, background: msg.background });
+        return;
+      }
       case 'setName': {
         const name = checkName(msg.name, bannedWords(this.env));
         if (!name.ok) return this.fail(ws, 'NAME_REJECTED', name.reason === 'TOO_LONG' ? '이름은 10자까지 쓸 수 있어요' : name.reason === 'EMPTY' ? '이름을 입력해 주세요' : '이름에 쓸 수 없는 말이 들어 있어요');
@@ -441,7 +454,7 @@ export class RoomDO extends DurableObject<Env> {
       guests[g.guest_id] = g.display_name ?? '';
     return {
       roomId: r.id, title: r.title, seasonId: r.season_id, themeId: r.theme_id, visibility: r.visibility, status: r.status,
-      joinCode: r.join_code, trees, placements, guests, ownerGuestId: r.owner_guest_id,
+      joinCode: r.join_code, background: r.background ?? getTheme(r.theme_id).defaultBackground, trees, placements, guests, ownerGuestId: r.owner_guest_id,
       createdAt: r.created_at, completedAt: r.completed_at, rev: r.rev,
     };
   }

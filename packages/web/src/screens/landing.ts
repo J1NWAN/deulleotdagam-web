@@ -1,6 +1,6 @@
 import { checkTitle, generateSlots, normalizeCode, TITLE_MAX, type SeasonInfo, type Visibility } from '@deulleotdagam/shared';
 import { api, ApiFailure } from '../api';
-import { esc, treeWithOrnamentsInner } from '../render/scene';
+import { backgroundPickerHtml, esc, treeWithOrnamentsInner } from '../render/scene';
 import { navigate } from '../router';
 import * as store from '../storage';
 import { themeAssets } from '../theme';
@@ -25,6 +25,7 @@ const fmtDate = (t: number) => new Intl.DateTimeFormat('ko-KR', { month: 'long',
 export function landingScreen(root: HTMLElement) {
   let season: SeasonInfo | null = null;
   let visibility: Visibility = 'private';
+  let background = theme.geometry.defaultBackground;
   const recent = store.recentRooms.list();
 
   root.innerHTML = `
@@ -51,6 +52,10 @@ export function landingScreen(root: HTMLElement) {
               <button type="button" data-vis="public" aria-pressed="false">공개방</button>
             </span>
             <p id="visHint">참여 코드를 아는 사람만 들어올 수 있어요.</p>
+            <fieldset class="bg-field">
+              <legend>배경 고르기 <small>(방장은 나중에 바꿀 수 있어요)</small></legend>
+              <div class="bg-opts sm" id="bgOpts">${backgroundPickerHtml(theme, background)}</div>
+            </fieldset>
             <button class="pxbtn primary big" id="createBtn" type="submit">방 만들기</button>
             <p class="field-err" id="createErr" role="alert"></p>
           </form>
@@ -128,6 +133,13 @@ export function landingScreen(root: HTMLElement) {
       : '참여 코드를 아는 사람만 들어올 수 있어요.';
   }));
 
+  $('bgOpts').addEventListener('click', e => {
+    const b = (e.target as Element).closest<HTMLElement>('[data-bg]');
+    if (!b) return;
+    background = b.dataset.bg!;
+    $('bgOpts').querySelectorAll('[data-bg]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  });
+
   $('createForm').addEventListener('submit', async e => {
     e.preventDefault();
     const err = $('createErr');
@@ -137,7 +149,7 @@ export function landingScreen(root: HTMLElement) {
     const btn = $('createBtn') as HTMLButtonElement;
     btn.disabled = true; err.textContent = '';
     try {
-      const r = await api.createRoom(chk.value, visibility);
+      const r = await api.createRoom(chk.value, visibility, background);
       store.ownerKey.set(r.roomId, r.ownerKey);
       store.justCreated.set(r.roomId, true);
       store.recentRooms.add({ joinCode: r.joinCode, title: chk.value, owner: true });

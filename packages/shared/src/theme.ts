@@ -28,6 +28,9 @@ export interface ThemeGeometry {
   /** 방장이 층별로 고르는 조명/가랜드 */
   strings: NamedItem[];
   topItem: string;
+  /** 방 배경 (그림은 web/public/backgrounds/bg-{id}.svg). 방을 만들 때 고르고 방장이 바꿀 수 있다 */
+  backgrounds: NamedItem[];
+  defaultBackground: string;
   /** 방을 만들 때 기본으로 걸어 두는 조명 */
   defaultBands: Record<string, Record<string, string>>;
 }
@@ -84,6 +87,14 @@ export const PIXEL_THEME: ThemeGeometry = {
     { id: 'fairy-lights', name: '요정 전구' },
   ],
   topItem: 'star-topper',
+  backgrounds: [
+    { id: 'living-room', name: '따뜻한 거실' },
+    { id: 'snowy-night', name: '눈 내리는 밤' },
+    { id: 'village', name: '겨울 마을' },
+    { id: 'aurora', name: '오로라' },
+    { id: 'winter-dawn', name: '겨울 새벽' },
+  ],
+  defaultBackground: 'living-room',
   defaultBands: {
     A: { b2: 'bead-chain', b3: 'fairy-lights' },
     B: { b1: 'fairy-lights', b2: 'garland-gold', b3: 'lights-string' },

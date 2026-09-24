@@ -3,11 +3,11 @@ import {
   type C2S, type Placement, type RoomSnapshot, type S2C, type Slot, type TreeSnapshot,
 } from '@deulleotdagam/shared';
 import { api, ApiFailure, NETWORK_MESSAGE, wsUrl } from '../api';
-import { esc, itemSvg, stringSvg, treeArtSvg } from '../render/scene';
+import { backgroundPickerHtml, esc, itemSvg, stringSvg, treeArtSvg } from '../render/scene';
 import { navigate } from '../router';
 import { openShareDialog } from '../share';
 import * as store from '../storage';
-import { themeAssets, type ThemeAssets } from '../theme';
+import { loadBackground, themeAssets, type ThemeAssets } from '../theme';
 import { $, closeAllDialogs, closeDialog, copyText, openDialog, toast, topDialog } from '../ui/dom';
 import { noticeScreen } from './notice';
 
@@ -192,6 +192,13 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
         if (viewing === k) closeDialog($('viewDlg'));
         break;
       }
+      case 'backgroundChanged': {
+        snap.background = m.background;
+        applyBackground();
+        $('bgOpts')?.querySelectorAll('[data-bg]').forEach(x => x.setAttribute('aria-pressed', String((x as HTMLElement).dataset.bg === m.background)));
+        if (me?.isOwner && $('bgDlg')?.classList.contains('open')) toast('배경을 바꿨어요');
+        break;
+      }
       case 'bandChanged': {
         const t = treeOf(m.treeId);
         if (m.stringId) t.bands[m.bandId] = m.stringId; else delete t.bands[m.bandId];
@@ -282,12 +289,13 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
         <div class="count" aria-live="polite"><span id="countTxt"></span><span class="bar"><i id="countBar"></i></span></div>
         <a class="home-m" href="/" data-link aria-label="처음으로" title="처음으로"><svg viewBox="0 0 10 10" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M4 0h2v1H4zM3 1h4v1H3zM2 2h6v1H2zM1 3h8v1H1zM0 4h10v1H0zM1 5h8v5H6V7H4v3H1z"/></svg></a>
         <span class="spacer"></span>
-        ${!readonly && owner ? `<button class="pxbtn" id="lightsBtn">조명 꾸미기</button><button class="pxbtn" id="myIdBtn">내 방 ID</button>` : ''}
+        ${!readonly && owner ? `<button class="pxbtn" id="bgBtn">배경 바꾸기</button><button class="pxbtn" id="lightsBtn">조명 꾸미기</button><button class="pxbtn" id="myIdBtn">내 방 ID</button>` : ''}
         ${!archiveView ? `<button class="pxbtn primary" id="shareBtn">참여 코드 <span class="code">${esc(snap.joinCode)}</span> 복사</button>` : ''}
       </header>
 
       <main class="stage" id="stage">
         <button class="done" id="doneBanner" type="button">${readonly ? '모든 자리에 장식이 달린 방이에요' : '세 그루 모두 완성됐어요! 사진으로 남겨 볼까요?'}</button>
+        <div class="stage-bg" id="stageBg" aria-hidden="true"></div>
         <div class="conn" id="conn" hidden>연결이 끊겼어요 · 다시 연결하는 중…</div>
         <div class="forest" id="forest"></div>
       </main>
@@ -311,6 +319,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     <div class="tip" id="tip" hidden></div>
     ${dialogsHtml()}`;
 
+    applyBackground();
     renderForest();
     if (!readonly) renderItems();
     renderChrome();
@@ -363,6 +372,14 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
         <p>나무를 고른 다음 층마다 두를 조명이나 가랜드를 골라주세요. 방장만 바꿀 수 있어요.</p>
         <div id="lightsRows"></div>
         <div class="row"><button class="pxbtn primary" id="lightsClose">완료</button></div>
+      </div>
+    </div>
+    <div class="scrim" id="bgDlg" role="dialog" aria-modal="true" aria-labelledby="bgTitle">
+      <div class="card wide">
+        <h3 id="bgTitle">배경 바꾸기</h3>
+        <p>방에 들어온 모두에게 바로 바뀐 배경이 보여요. 방장만 바꿀 수 있어요.</p>
+        <div class="bg-opts" id="bgOpts">${backgroundPickerHtml(theme, snap!.background)}</div>
+        <div class="row"><button class="pxbtn primary" id="bgClose">완료</button></div>
       </div>
     </div>
     <div class="scrim" id="nameDlg" role="dialog" aria-modal="true" aria-labelledby="nameTitle">
@@ -442,6 +459,18 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     plate.classList.toggle('full', snap!.placements.filter(p => p.treeId === treeId).length === t.slots.length);
     renderProgress();
     markOk();
+  }
+
+  /** 배경 그림을 받아 무대 뒤에 깐다. 받기 전이나 실패하면 기본 벽지 무늬가 보인다 */
+  function applyBackground() {
+    const id = snap?.background;
+    if (!id) return;
+    loadBackground(id).then(bg => {
+      const el = $('stageBg');
+      if (!el || snap?.background !== id) return;
+      el.innerHTML = `<svg viewBox="${bg.viewBox}" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges">${bg.inner}</svg>`;
+      $('stage').classList.add('has-bg');
+    }).catch(err => console.error(err));
   }
 
   function updateTreeArt(treeId: string) {
@@ -688,6 +717,12 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     on('myIdBtn', openIntro);
     on('lightsBtn', () => { renderLights(); openDialog($('lightsDlg'), { focus: $('lightsClose') }); });
     on('lightsClose', () => closeDialog($('lightsDlg')));
+    on('bgBtn', () => openDialog($('bgDlg'), { focus: $('bgOpts').querySelector<HTMLElement>('[aria-pressed="true"]') }));
+    on('bgClose', () => closeDialog($('bgDlg')));
+    $('bgOpts').addEventListener('click', e => {
+      const b = (e.target as Element).closest<HTMLElement>('[data-bg]');
+      if (b && b.dataset.bg !== snap!.background) send({ t: 'setBackground', background: b.dataset.bg! });
+    });
     $('lightsRows').addEventListener('click', e => {
       const tb = (e.target as Element).closest<HTMLElement>('button[data-tree]');
       if (tb) { lightsTree = tb.dataset.tree!; renderLights(); ($('lightsRows').querySelector(`[data-tree="${lightsTree}"]`) as HTMLElement).focus(); return; }

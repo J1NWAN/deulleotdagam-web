@@ -1,7 +1,7 @@
 import type { ArchiveResponse, RoomSnapshot } from '@deulleotdagam/shared';
 import { api, ApiFailure } from '../api';
 import { esc, forestSvg, itemSvg } from '../render/scene';
-import { themeAssets } from '../theme';
+import { backgroundUrl, themeAssets } from '../theme';
 
 /** 지난 시즌 방 둘러보기: 완성된 방 랜덤 노출(10개 미만이면 미완성 포함), 열람 전용 */
 export function archiveScreen(root: HTMLElement) {
@@ -17,12 +17,6 @@ export function archiveScreen(root: HTMLElement) {
         <div id="archBody"><p>불러오는 중…</p></div>
       </main>
     </div>`;
-
-  const css = getComputedStyle(document.documentElement);
-  const colors = {
-    wall: css.getPropertyValue('--wall').trim() || '#d9c2c6', wallLine: css.getPropertyValue('--wall-line').trim() || '#cfb5ba',
-    floor: css.getPropertyValue('--floor').trim() || '#9a6a4c', floorLine: css.getPropertyValue('--floor-line').trim() || '#875b40',
-  };
 
   const empty = (noun: string) => `
     <div class="empty-state">
@@ -53,7 +47,9 @@ export function archiveScreen(root: HTMLElement) {
       try {
         const snap: RoomSnapshot = await api.archivedSnapshot(r.roomId);
         const el = document.getElementById('th-' + r.roomId);
-        if (el && alive) el.innerHTML = forestSvg(themeAssets(snap.themeId), snap, 600, 400, { colors });
+        if (!el || !alive) return;
+        el.style.backgroundImage = `url("${backgroundUrl(snap.background)}")`;
+        el.innerHTML = forestSvg(themeAssets(snap.themeId), snap, 600, 400, { background: false });
       } catch { /* 썸네일 없이 표시 */ }
     }));
   }).catch(x => {
