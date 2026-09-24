@@ -6,6 +6,9 @@
 .top{grid-area:top;display:flex;align-items:center;gap:12px;padding:12px 18px;flex-wrap:wrap;
   background:var(--paper);border-bottom:3px solid var(--ink)}
 .top .home{font-family:var(--ko);font-weight:700;text-decoration:none;font-size:.9rem;border-right:2px solid var(--panel-line);padding-right:12px}
+.home-m{display:none;flex:none;width:36px;height:36px;margin-left:auto;align-items:center;justify-content:center;border:2px solid var(--ink);background:var(--panel);box-shadow:2px 2px 0 var(--ink);color:var(--ink)}
+.home-m:active{transform:translate(2px,2px);box-shadow:none}
+.home-m svg{width:20px;height:20px}
 .title{font-size:1.2rem;font-weight:700;margin:0;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40vw}
 .badge[aria-pressed="false"]{background:var(--ink);color:var(--paper)}
 .top .spacer{flex:1}
@@ -29,7 +32,9 @@
 .plate.full{background:var(--pine);color:#fff3d6}
 
 .slot{position:absolute;transform:translate(-50%,-50%);border:0;background:none;padding:0;touch-action:none;aspect-ratio:1}
-.slot.empty::before{content:"";position:absolute;inset:14%;border:2px dashed var(--slot);border-radius:50%;transition:border-color .15s}
+/* 빈 자리는 평소에는 숨기고, 장식을 고르거나 끌 때만 달 수 있는 자리를 보여준다 */
+.slot.empty::before{content:"";position:absolute;inset:14%;border:2px dashed transparent;border-radius:50%;transition:border-color .15s}
+.slot.empty:focus-visible::before{border-color:var(--slot)}
 .slot.empty.top::before{border-radius:0;inset:18%}
 .stage.dragging .slot.empty.ok::before, .stage.picking .slot.empty.ok::before{border-color:var(--slot-hot);border-style:solid;
   background:color-mix(in srgb,var(--gold-hi) 25%,transparent)}
@@ -105,7 +110,8 @@
   .app.readonly{grid-template-rows:auto 1fr auto;grid-template-areas:"top" "stage" "bar"}
   .top{padding:10px 12px;gap:8px}
   .top .home{display:none}
-  .title{font-size:1.02rem;max-width:60vw}
+  .home-m{display:inline-flex}
+  .title{font-size:1.02rem;max-width:calc(100vw - 210px)}
   .top .spacer{flex-basis:100%;height:0}
   .count .bar,.pxbtn .code{display:none}
   .top .pxbtn{padding:6px 9px;font-size:.8rem}

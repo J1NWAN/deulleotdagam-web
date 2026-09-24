@@ -280,6 +280,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
         <h1 class="title" id="roomTitle">${esc(snap.title)}</h1>
         ${readonly ? '<span class="badge ro">읽기 전용</span>' : `<button class="badge" id="privBtn" title="방장만 바꿀 수 있어요"></button>`}
         <div class="count" aria-live="polite"><span id="countTxt"></span><span class="bar"><i id="countBar"></i></span></div>
+        <a class="home-m" href="/" data-link aria-label="처음으로" title="처음으로"><svg viewBox="0 0 10 10" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M4 0h2v1H4zM3 1h4v1H3zM2 2h6v1H2zM1 3h8v1H1zM0 4h10v1H0zM1 5h8v5H6V7H4v3H1z"/></svg></a>
         <span class="spacer"></span>
         ${!readonly && owner ? `<button class="pxbtn" id="lightsBtn">조명 꾸미기</button><button class="pxbtn" id="myIdBtn">내 방 ID</button>` : ''}
         ${!archiveView ? `<button class="pxbtn primary" id="shareBtn">참여 코드 <span class="code">${esc(snap.joinCode)}</span> 복사</button>` : ''}
@@ -320,6 +321,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     return `
     <div class="scrim" id="memoDlg" role="dialog" aria-modal="true" aria-labelledby="memoTitle">
       <div class="card">
+        <button class="dlg-x" id="memoClose" aria-label="닫기" title="닫기"><svg viewBox="0 0 7 7" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M0 0h1v1H0zM1 1h1v1H1zM2 2h1v1H2zM3 3h1v1H3zM4 4h1v1H4zM5 5h1v1H5zM6 6h1v1H6zM6 0h1v1H6zM5 1h1v1H5zM4 2h1v1H4zM2 4h1v1H2zM1 5h1v1H1zM0 6h1v1H0z"/></svg></button>
         <div class="memo-head"><span id="memoIcon"></span><div><h3 id="memoTitle">메모 남기기</h3><div class="who" id="memoWho"></div></div></div>
         <label class="sr-only" for="memoInput">메모</label>
         <textarea id="memoInput" maxlength="${MEMO_MAX}" placeholder="이 장식에 남길 한마디 (선택)"></textarea>
@@ -700,6 +702,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     ($('memoInput') as HTMLTextAreaElement).addEventListener('input', e => { $('memoCount').textContent = String([...(e.target as HTMLTextAreaElement).value].length); });
     $('memoInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); confirmMemo(); } });
     on('memoCancel', () => { pending = null; closeDialog($('memoDlg')); });
+    on('memoClose', () => { pending = null; closeDialog($('memoDlg')); });
     on('memoOk', confirmMemo);
 
     on('viewClose', () => closeDialog($('viewDlg')));
