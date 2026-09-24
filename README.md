@@ -46,24 +46,40 @@ npm run test:e2e          # API/웹소켓 + 정책(자동 삭제, 시즌 종료,
 
 ## 배포 (Cloudflare 무료 플랜)
 
-1. 로그인: `npx wrangler login`
-2. D1 만들기: `cd packages/worker && npx wrangler d1 create deulleotdagam-index`
-   → 출력된 `database_id`를 `wrangler.jsonc`에 넣기
-3. 원격 마이그레이션: `npm run db:migrate:remote -w @deulleotdagam/worker`
-4. 비밀값: `npx wrangler secret put IP_SALT` (필수, 긴 무작위 문자열), `npx wrangler secret put ADMIN_TOKEN`
-5. Worker 배포: `npm run deploy -w @deulleotdagam/worker`
-6. 프론트 빌드: `VITE_API_BASE=https://deulleotdagam-api.<계정>.workers.dev npm run build`
-7. Pages 배포: `npx wrangler pages deploy packages/web/dist --project-name deulleotdagam`
-   (`deulleotdagam.pages.dev`가 이미 쓰이고 있으면 다른 이름으로 정하고 `ALLOWED_ORIGINS`도 맞춰 바꿀 것)
-8. `wrangler.jsonc`의 `ALLOWED_ORIGINS`를 실제 Pages 주소로 맞춘 뒤 Worker 재배포
-9. Cloudflare 대시보드에서 Workers/D1/Durable Objects **사용량 알림**을 켜 두기
-   (무료 한도를 넘으면 요청이 실패하고, 화면에는 "오늘은 사용량이 많아 잠시 쉬어가요"가 나옵니다)
+현재 배포 주소
+- 서비스: https://deulleotdagam.jinwan.workers.dev
+- API: https://deulleotdagam-api.jinwan.workers.dev
+
+프론트는 Pages 대신 Cloudflare가 새 프로젝트에 권장하는 **Workers 정적 자산**(`packages/web/wrangler.jsonc`)으로 배포합니다.
+
+### 다시 배포하기
+
+```bash
+npx wrangler login                              # 처음 한 번
+npm run deploy -w @deulleotdagam/worker         # API
+npm run build && npm run deploy -w @deulleotdagam/web   # 화면 (.env.production의 API 주소로 빌드)
+```
+
+DB 구조를 바꿨다면 먼저 `npm run db:migrate:remote -w @deulleotdagam/worker`.
+
+### 처음 구성할 때 한 일 (참고)
+1. Cloudflare 계정 이메일 인증, workers.dev 하위 도메인 `jinwan` 등록
+2. `npx wrangler d1 create deulleotdagam-index` → id를 `packages/worker/wrangler.jsonc`에 기록 → 원격 마이그레이션
+3. 비밀값 등록: `npx wrangler secret put IP_SALT`(긴 무작위 문자열), `npx wrangler secret put ADMIN_TOKEN`
+4. API Worker 배포 → 프론트 Worker 배포
+5. 무료 한도 초과 시 요청이 실패하므로 대시보드에서 **사용량 알림**을 켜 두는 것을 권장
+
+### 직접 도메인 연결하기
+1. 도메인을 Cloudflare에 등록(네임서버 변경)
+2. 대시보드 → Workers & Pages → `deulleotdagam` → 설정 → 도메인 및 경로 → **사용자 지정 도메인** 추가 (예: `deulleotdagam.com`)
+3. API도 바꾸려면 `deulleotdagam-api`에 `api.deulleotdagam.com` 등을 추가하고 `packages/web/.env.production`의 `VITE_API_BASE`를 바꾼 뒤 화면 다시 배포
+4. `packages/worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 새 화면 주소를 쉼표로 추가하고 API 다시 배포 (빠뜨리면 화면에서 API 호출이 막힘)
 
 ## 관리자 API (관리자 화면 대신)
 
 ```bash
 # 신고 누적으로 비활성된 방 목록
-curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<worker>/api/admin/rooms?status=disabled
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://deulleotdagam-api.jinwan.workers.dev/api/admin/rooms?status=disabled
 # 복구 / 비활성 / 삭제
-curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"action":"restore"}' https://<worker>/api/admin/rooms/<roomId>
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"action":"restore"}' https://deulleotdagam-api.jinwan.workers.dev/api/admin/rooms/<roomId>
 ```

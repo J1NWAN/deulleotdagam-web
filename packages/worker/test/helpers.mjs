@@ -3,14 +3,15 @@ import http from 'node:http';
 // 통합 테스트 도우미: 실행 중인 `wrangler dev`에 HTTP/웹소켓으로 붙는다.
 export const BASE = process.env.E2E_BASE ?? 'http://localhost:8787';
 
+const LOCAL = /localhost|127\.0\.0\.1/.test(BASE);
 let ipSeq = Math.floor(Math.random() * 200);
-/** 테스트마다 다른 IP처럼 보이게 (로컬에서만 가능, 운영에서는 Cloudflare가 덮어씀) */
+/** 테스트마다 다른 IP처럼 보이게 (로컬에서만. 운영 Cloudflare는 이 헤더가 붙은 요청을 403으로 막는다) */
 export const freshIp = () => `10.${Math.floor(Math.random() * 250)}.${(ipSeq++) % 250}.${Math.floor(Math.random() * 250)}`;
 
 export async function api(method, path, body, headers = {}) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': freshIp(), ...headers },
+    headers: { 'Content-Type': 'application/json', ...(LOCAL ? { 'CF-Connecting-IP': freshIp() } : {}), ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
@@ -26,7 +27,7 @@ export async function createRoom(title = '테스트 트리', visibility = 'priva
 
 /** 웹소켓 클라이언트: 받은 메시지를 쌓아 두고 조건에 맞는 메시지를 기다린다 */
 export function connect(roomId, { ip = freshIp(), base = BASE } = {}) {
-  const ws = new WebSocket(base.replace(/^http/, 'ws') + `/api/rooms/${roomId}/ws`, { headers: { 'CF-Connecting-IP': ip } });
+  const ws = new WebSocket(base.replace(/^http/, 'ws') + `/api/rooms/${roomId}/ws`, LOCAL ? { headers: { 'CF-Connecting-IP': ip } } : undefined);
   const inbox = [];
   const waiters = [];
   let closed = null;

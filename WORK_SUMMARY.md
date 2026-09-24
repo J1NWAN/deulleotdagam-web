@@ -115,10 +115,23 @@
 
 ### 확인하지 못한 것
 - **실제 휴대폰 터치 드래그**(데스크톱 Chrome에서 좁은 폭으로만 확인). 코드는 프로토타입의 터치 처리(`touch-action`, 방향 판정)를 그대로 옮겼습니다.
-- **실제 Cloudflare 배포**(계정 로그인·D1 생성 필요). 로컬 `wrangler dev`와 배포 dry-run까지만 확인했습니다. 절차는 README에 있습니다.
+- ~~실제 Cloudflare 배포~~ → 5절에서 배포 후 실제 주소로 확인했습니다.
 - 무료 한도 초과 상황(실제로 한도를 넘길 수 없어 오류 문구 처리 코드만 작성)
 
-## 5. 커밋 메시지
+## 5. 배포 (2026-09-24)
+
+| 구분 | 주소 / 이름 |
+|---|---|
+| 서비스(화면) | https://deulleotdagam.jinwan.workers.dev — Workers 정적 자산 `deulleotdagam` |
+| API | https://deulleotdagam-api.jinwan.workers.dev — Worker `deulleotdagam-api` + `RoomDO` |
+| DB | D1 `deulleotdagam-index` (APAC) |
+| 비밀값 | `IP_SALT`, `ADMIN_TOKEN` (Cloudflare에만 저장, 저장소에 없음) |
+
+- 원래 계획은 Cloudflare Pages(`deulleotdagam.pages.dev`)였지만, Cloudflare CLI가 새 프로젝트에는 Pages 대신 Workers 정적 자산을 권장해 사용자 확인 후 그렇게 배포했습니다. 직접 도메인은 나중에 연결할 수 있습니다(README 참고).
+- 배포 후 실제 주소에서 확인: 방 만들기 → 방장 ID 안내 → 외부 참여자 장식이 실시간 반영 → 규칙 검증(꼭대기에 종 거부) → ping 자동 응답 → 방 삭제 후 참여 코드 404, CORS(허용 출처만 통과), 관리자 API(토큰 없으면 401). 확인용 방은 삭제했습니다.
+- 운영 Cloudflare는 가짜 `CF-Connecting-IP` 헤더가 붙은 요청을 403으로 막으므로, IP 기반 제한(방 생성·신고)을 헤더 조작으로 우회할 수 없음을 확인했습니다.
+
+## 6. 커밋 메시지 (첫 커밋)
 
 ```
 feat: 들렀다감 겨울 트리 꾸미기 서비스 첫 구현 (M1~M7)

@@ -1,0 +1,11 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // 프론트(정적 파일)만 배포하는 Worker. 스크립트 없이 dist를 그대로 내보낸다.
+  "name": "deulleotdagam",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    // /r/코드, /archive 같은 주소를 새로고침해도 index.html을 내보낸다
+    "not_found_handling": "single-page-application"
+  }
+}
