@@ -53,12 +53,13 @@ function build(id: string, svg: Record<string, SvgAsset>, pausedClass: string, f
 const PIXEL_FX: Pick<ThemeAssets, 'tierStarts' | 'bandTier' | 'backgroundFx'> = {
   tierStarts: [66, 94, 124, 157],
   bandTier: { b1: 2, b2: 3, b3: 4 },
+  // 나무 흔들림(wind)은 층을 밀어내는 방식이 인위적이라 꺼 둠. 그림 프레임으로 다시 만들 예정 (2단계)
   backgroundFx: {
     'living-room': { wind: 0, snow: 0 },
-    'snowy-night': { wind: 1, snow: 2 },
-    village: { wind: 1, snow: 1 },
-    aurora: { wind: 1, snow: 0 },
-    'winter-dawn': { wind: 2, snow: 0 },
+    'snowy-night': { wind: 0, snow: 2 },
+    village: { wind: 0, snow: 1 },
+    aurora: { wind: 0, snow: 0 },
+    'winter-dawn': { wind: 0, snow: 0 },
   },
 };
 
