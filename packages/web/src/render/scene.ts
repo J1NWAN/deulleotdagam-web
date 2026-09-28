@@ -30,16 +30,9 @@ export function swagSvg(theme: ThemeAssets, stringId: string, b: Band): string {
  * 나무 그림은 고해상도 그리드(예: 144×192)로 그려져 있고, 슬롯·조명 좌표는 48×64 단위다.
  * 그림을 좌표계 크기에 맞춰 넣어 기존 방의 슬롯 좌표를 그대로 쓴다.
  */
-function treeLayer(theme: ThemeAssets): string {
+export function treeLayer(theme: ThemeAssets): string {
   const g = theme.geometry;
   return `<svg width="${g.width}" height="${g.height}" viewBox="${theme.tree.viewBox}" shape-rendering="crispEdges">${theme.tree.inner}</svg>`;
-}
-
-/** 나무 그림 + 조명 (슬롯 버튼은 따로 얹는다) */
-export function treeArtSvg(theme: ThemeAssets, tree: Pick<TreeSnapshot, 'bands'>): string {
-  const g = theme.geometry;
-  const bands = g.bands.map(b => (tree.bands[b.id] ? swagSvg(theme, tree.bands[b.id], b) : '')).join('');
-  return `<svg viewBox="${g.stageViewBox.join(' ')}" shape-rendering="crispEdges" aria-hidden="true">${treeLayer(theme)}${bands}</svg>`;
 }
 
 /**

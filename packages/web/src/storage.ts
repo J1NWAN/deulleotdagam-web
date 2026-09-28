@@ -25,7 +25,7 @@ export const justCreated = {
   set: (roomId: string, on: boolean) => { try { on ? sessionStorage.setItem(`dd:new:${roomId}`, '1') : sessionStorage.removeItem(`dd:new:${roomId}`); } catch { /* */ } },
 };
 
-// TODO(open-question #12): 반짝임 끄기를 사용자 설정으로 남김 (임시안)
+// TODO(open-question #12): 움직임(반짝임·흔들림·눈) 끄기를 사용자 설정으로 남김 (임시안)
 export const twinkle = {
   get: () => get('dd:twinkle') !== 'off',
   set: (on: boolean) => set('dd:twinkle', on ? null : 'off'),

@@ -30,7 +30,7 @@
 .tree-col{position:relative;display:flex;flex-direction:column;align-items:center;flex:none;
   --h:calc(100cqh - 64px); width:min(31.5cqw, calc(var(--h) * 48 / 68))}
 .tree-col.side{width:min(27cqw, calc(var(--h) * .86 * 48 / 68))}
-.tree-wrap{position:relative;width:100%;aspect-ratio:48/68}
+.tree-wrap{position:relative;width:100%;aspect-ratio:48/68;container-type:inline-size}
 .tree-wrap > svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .plate{margin-top:6px;font-size:.82rem;padding:3px 10px;background:var(--paper);border:2px solid var(--ink);box-shadow:2px 2px 0 var(--ink);white-space:nowrap}
 .plate b{font-family:var(--px);font-weight:400;margin-left:4px}
@@ -56,6 +56,42 @@
   padding:8px 14px;border:3px solid var(--ink);box-shadow:4px 4px 0 var(--ink);font-size:.95rem;display:none;white-space:nowrap}
 .done.show{display:block}
 .conn{position:absolute;top:14px;right:14px;z-index:3;background:var(--ink);color:var(--paper);padding:5px 10px;font-size:.8rem;border:2px solid var(--ink)}
+
+/* ---------- 움직임 ----------
+   나무는 층별 레이어(.t1~.t4)와 그 층의 장식이 같이 좌우로 흔들린다.
+   그림 1픽셀 = 나무 폭의 1/144 (100cqw/144). steps로 픽셀 단위로 끊어 움직여 도트가 뭉개지지 않게 한다. */
+@keyframes sway1{0%,100%{translate:0 0}25%{translate:calc(100cqw/144) 0}50%{translate:0 0}75%{translate:calc(-100cqw/144) 0}}
+@keyframes sway2{0%,100%{translate:0 0}12.5%{translate:calc(100cqw/144) 0}25%{translate:calc(200cqw/144) 0}37.5%{translate:calc(100cqw/144) 0}
+  50%{translate:0 0}62.5%{translate:calc(-100cqw/144) 0}75%{translate:calc(-200cqw/144) 0}87.5%{translate:calc(-100cqw/144) 0}}
+@keyframes sway3{0%,100%{translate:0 0}8.33%{translate:calc(100cqw/144) 0}16.67%{translate:calc(200cqw/144) 0}25%{translate:calc(300cqw/144) 0}
+  33.33%{translate:calc(200cqw/144) 0}41.67%{translate:calc(100cqw/144) 0}50%{translate:0 0}58.33%{translate:calc(-100cqw/144) 0}
+  66.67%{translate:calc(-200cqw/144) 0}75%{translate:calc(-300cqw/144) 0}83.33%{translate:calc(-200cqw/144) 0}91.67%{translate:calc(-100cqw/144) 0}}
+.sw{--lag:0s;animation-duration:var(--sway-dur,5s);animation-timing-function:steps(1,end);animation-iteration-count:infinite;
+  animation-delay:calc(var(--tree-delay,0s) + var(--lag))}
+.t2{--lag:.18s}.t3{--lag:.36s}.t4{--lag:.54s}
+/* 살랑: 꼭대기 2픽셀, 2·3층 1픽셀, 4층은 그대로 */
+.stage[data-wind="1"]{--sway-dur:5.2s}
+.stage[data-wind="1"] .t1{animation-name:sway2}
+.stage[data-wind="1"] .t2,.stage[data-wind="1"] .t3{animation-name:sway1}
+/* 조금 센 바람: 꼭대기 3픽셀, 아래로 갈수록 작게 */
+.stage[data-wind="2"]{--sway-dur:4s}
+.stage[data-wind="2"] .t1{animation-name:sway3}
+.stage[data-wind="2"] .t2{animation-name:sway2}
+.stage[data-wind="2"] .t3,.stage[data-wind="2"] .t4{animation-name:sway1}
+
+/* 내리는 눈: 배경 그림 1픽셀 크기(무대를 덮는 배율)에 맞춘 네모 눈송이 */
+.snow{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;--apx:max(calc(100cqw/480),calc(100cqh/270))}
+.snow.front{z-index:2}
+.snow i{position:absolute;top:-3%;display:block;animation:snow-fall var(--dur) linear var(--delay) infinite}
+.snow b{display:block;width:calc(var(--s)*var(--apx));height:calc(var(--s)*var(--apx));background:#f5f8ff;
+  animation:snow-sway var(--sway) ease-in-out var(--delay) infinite alternate}
+@keyframes snow-fall{to{translate:0 106cqh}}
+@keyframes snow-sway{from{translate:calc(var(--dx)*var(--apx)*-1) 0}to{translate:calc(var(--dx)*var(--apx)) 0}}
+
+/* 움직임 끄기 · 시스템 "동작 줄이기": 흔들림은 제자리로, 눈은 숨김 */
+.px-paused .sw{animation:none!important}
+.px-paused .snow{display:none}
+@media (prefers-reduced-motion:reduce){ .sw{animation:none!important} .snow{display:none} }
 
 .tip{position:fixed;z-index:30;pointer-events:none;max-width:220px;padding:8px 10px;background:var(--paper);
   border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);font-size:.88rem;line-height:1.45;word-break:break-word}
