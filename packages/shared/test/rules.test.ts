@@ -118,8 +118,27 @@ describe('배경', () => {
       const url = new URL(`../../web/public/backgrounds/bg-${b.id}.svg`, import.meta.url);
       expect(existsSync(url), b.id).toBe(true);
       const svg = readFileSync(url, 'utf8');
-      expect(svg).toMatch(/viewBox="0 0 160 90"/);
+      expect(svg).toMatch(/viewBox="0 0 480 270"/);
       expect(svg).not.toMatch(/c2pa|<metadata/);
+    }
+  });
+});
+
+describe('픽셀 에셋 (하이비트, 화면에서 원본 1픽셀 ≈ 3px로 통일)', () => {
+  const read = (n: string) => readFileSync(new URL(`../../web/src/assets/pixel/${n}.svg`, import.meta.url), 'utf8');
+  const vb = (svg: string) => /viewBox="([^"]+)"/.exec(svg)?.[1];
+  it('나무는 좌표 단위(48×64)의 3배 그리드', () => {
+    expect(vb(read('tree'))).toBe(`0 0 ${T.width * 3} ${T.height * 3}`);
+  });
+  it('장식 20×20(별은 28×28), 조명 128×24', () => {
+    for (const i of T.items) expect(vb(read(i.id)), i.id).toBe(i.id === T.topItem ? '0 0 28 28' : '0 0 20 20');
+    for (const st of T.strings) expect(vb(read(st.id)), st.id).toBe('0 0 128 24');
+  });
+  it('인라인으로 여러 번 넣어도 안전: id·style·metadata 없음, crispEdges', () => {
+    for (const n of ['tree', ...T.items.map(i => i.id), ...T.strings.map(s => s.id)]) {
+      const svg = read(n);
+      expect(svg, n).not.toMatch(/\bid="|<style|<metadata|c2pa|<image/);
+      expect(svg, n).toMatch(/shape-rendering="crispEdges"/);
     }
   });
 });

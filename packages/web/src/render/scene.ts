@@ -13,7 +13,10 @@ export function stringSvg(theme: ThemeAssets, stringId: string): string {
   return a ? `<svg viewBox="${a.viewBox}" shape-rendering="crispEdges" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${a.inner}</svg>` : '';
 }
 
-/** 층 하단에 걸치는 조명 띠: 늘리지 않고 고정 배율로 그린 뒤 가운데만 잘라 쓴다 (04 문서 4절) */
+/**
+ * 층 하단에 걸치는 조명 띠: 늘리지 않고 고정 배율로 그린 뒤 가운데만 잘라 쓴다 (04 문서 4절).
+ * 배율은 나무 그림과 같은 픽셀 크기가 되도록 테마에서 정한다 (조명 1픽셀 = 나무 1픽셀).
+ */
 export function swagSvg(theme: ThemeAssets, stringId: string, b: Band): string {
   const st = theme.strings[stringId];
   if (!st) return '';
@@ -23,11 +26,20 @@ export function swagSvg(theme: ThemeAssets, stringId: string, b: Band): string {
   return `<svg x="${b.cx - w / 2}" y="${b.y}" width="${w}" height="${h}" viewBox="${(W - vw) / 2} 0 ${vw} ${H}" preserveAspectRatio="none" shape-rendering="crispEdges">${st.inner}</svg>`;
 }
 
+/**
+ * 나무 그림은 고해상도 그리드(예: 144×192)로 그려져 있고, 슬롯·조명 좌표는 48×64 단위다.
+ * 그림을 좌표계 크기에 맞춰 넣어 기존 방의 슬롯 좌표를 그대로 쓴다.
+ */
+function treeLayer(theme: ThemeAssets): string {
+  const g = theme.geometry;
+  return `<svg width="${g.width}" height="${g.height}" viewBox="${theme.tree.viewBox}" shape-rendering="crispEdges">${theme.tree.inner}</svg>`;
+}
+
 /** 나무 그림 + 조명 (슬롯 버튼은 따로 얹는다) */
 export function treeArtSvg(theme: ThemeAssets, tree: Pick<TreeSnapshot, 'bands'>): string {
   const g = theme.geometry;
   const bands = g.bands.map(b => (tree.bands[b.id] ? swagSvg(theme, tree.bands[b.id], b) : '')).join('');
-  return `<svg viewBox="${g.stageViewBox.join(' ')}" shape-rendering="crispEdges" aria-hidden="true"><g>${theme.tree.inner}</g>${bands}</svg>`;
+  return `<svg viewBox="${g.stageViewBox.join(' ')}" shape-rendering="crispEdges" aria-hidden="true">${treeLayer(theme)}${bands}</svg>`;
 }
 
 /**
@@ -43,7 +55,7 @@ export function treeWithOrnamentsInner(theme: ThemeAssets, tree: TreeSnapshot, p
     if (!a) return '';
     return `<svg x="${s.x - s.size / 2}" y="${s.y - s.size / 2}" width="${s.size}" height="${s.size}" viewBox="${a.viewBox}" shape-rendering="crispEdges">${a.inner}</svg>`;
   }).join('');
-  return `<g>${theme.tree.inner}</g>${bands}${orn}`;
+  return `${treeLayer(theme)}${bands}${orn}`;
 }
 
 /**

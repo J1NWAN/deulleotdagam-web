@@ -12,7 +12,7 @@ export interface ThemeAssets {
   strings: Record<string, SvgAsset>;
   /** 반짝임 일시정지 클래스 (테마별 CSS 접두어) */
   pausedClass: string;
-  /** 도트 크기를 층마다 같게 유지하려고 조명은 고정 배율로 그린 뒤 가운데만 잘라 쓴다 */
+  /** 조명 1픽셀의 크기(좌표 단위). 나무 그림 1픽셀과 같게 해 도트 크기를 통일한다 */
   swagScale: number;
 }
 
@@ -29,8 +29,10 @@ const pixelSvg = Object.fromEntries(
   Object.entries(pixelFiles).map(([path, raw]) => [path.split('/').pop()!.replace('.svg', ''), parseSvg(raw)]),
 );
 
-function build(id: string, svg: Record<string, SvgAsset>, pausedClass: string, swagScale: number): ThemeAssets {
+function build(id: string, svg: Record<string, SvgAsset>, pausedClass: string): ThemeAssets {
   const geometry = getTheme(id);
+  // 나무 그림 그리드(144) ÷ 좌표 단위(48) = 3 → 조명 1픽셀 = 1/3 단위
+  const swagScale = geometry.width / svg.tree.width;
   const pick = (ids: { id: string }[]) => Object.fromEntries(ids.map(i => {
     if (!svg[i.id]) throw new Error(`missing asset ${id}/${i.id}`);
     return [i.id, svg[i.id]];
@@ -39,7 +41,7 @@ function build(id: string, svg: Record<string, SvgAsset>, pausedClass: string, s
 }
 
 const THEMES: Record<string, ThemeAssets> = {
-  pixel: build('pixel', pixelSvg, 'px-paused', 0.62),
+  pixel: build('pixel', pixelSvg, 'px-paused'),
 };
 
 export function themeAssets(id: string): ThemeAssets {
