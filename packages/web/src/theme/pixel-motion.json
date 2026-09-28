@@ -1,0 +1,193 @@
+{
+ "tree": {
+  "breeze": {
+   "src": "tree--breeze.svg",
+   "frames": 8,
+   "fps": 3,
+   "topDx": [0,2,3,2,0,-2,-3,-2],
+   "offsets": [
+    [[0,191,0]],
+    [
+     [0,35,2],
+     [36,95,1],
+     [96,191,0]
+    ],
+    [
+     [0,27,3],
+     [28,62,2],
+     [63,109,1],
+     [110,191,0]
+    ],
+    [
+     [0,35,2],
+     [36,95,1],
+     [96,191,0]
+    ],
+    [[0,191,0]],
+    [
+     [0,35,-2],
+     [36,95,-1],
+     [96,191,0]
+    ],
+    [
+     [0,27,-3],
+     [28,62,-2],
+     [63,109,-1],
+     [110,191,0]
+    ],
+    [
+     [0,35,-2],
+     [36,95,-1],
+     [96,191,0]
+    ]
+   ]
+  },
+  "wind": {
+   "src": "tree--wind.svg",
+   "frames": 8,
+   "fps": 4,
+   "topDx": [0,2,4,5,4,2,0,-2],
+   "offsets": [
+    [[0,191,0]],
+    [
+     [0,37,2],
+     [38,98,1],
+     [99,191,0]
+    ],
+    [
+     [0,24,4],
+     [25,50,3],
+     [51,81,2],
+     [82,120,1],
+     [121,191,0]
+    ],
+    [
+     [0,21,5],
+     [22,42,4],
+     [43,65,3],
+     [66,91,2],
+     [92,124,1],
+     [125,191,0]
+    ],
+    [
+     [0,24,4],
+     [25,50,3],
+     [51,81,2],
+     [82,120,1],
+     [121,191,0]
+    ],
+    [
+     [0,37,2],
+     [38,98,1],
+     [99,191,0]
+    ],
+    [[0,191,0]],
+    [
+     [0,37,-2],
+     [38,98,-1],
+     [99,191,0]
+    ]
+   ]
+  }
+ },
+ "living-room": {
+  "base": "backgrounds/bg-living-room.svg",
+  "tree": "static",
+  "layers": ["fire","candle"],
+  "fire": {
+   "src": "backgrounds/bg-living-room--fire.svg",
+   "frames": 4,
+   "fps": 8,
+   "box": {"x":69,"y":138,"w":32,"h":50}
+  },
+  "candle": {
+   "src": "backgrounds/bg-living-room--candle.svg",
+   "frames": 3,
+   "fps": 5,
+   "box": {"x":26,"y":83,"w":123,"h":4}
+  },
+  "window": {"x":338,"y":38,"w":108,"h":102},
+  "windowVisible": {"x":342,"y":38,"w":100,"h":102},
+  "windowMullions": [
+   {"x":390,"y":38,"w":3,"h":102},
+   {"x":338,"y":86,"w":108,"h":3}
+  ]
+ },
+ "village": {
+  "base": "backgrounds/bg-village.svg",
+  "tree": "breeze",
+  "layers": ["smoke"],
+  "smoke": {
+   "src": "backgrounds/bg-village--smoke.svg",
+   "frames": 6,
+   "fps": 4,
+   "box": {"x":17,"y":72,"w":418,"h":59}
+  },
+  "windowFlicker": {
+   "inBase": true,
+   "class": "px-fairy",
+   "windows": [
+    {"x":12,"y":167,"w":9,"h":10},
+    {"x":385,"y":157,"w":9,"h":10},
+    {"x":463,"y":174,"w":8,"h":9}
+   ]
+  }
+ },
+ "aurora": {
+  "base": "backgrounds/bg-aurora.svg",
+  "tree": "breeze",
+  "layers": ["aurora"],
+  "aurora": {
+   "src": "backgrounds/bg-aurora--aurora.svg",
+   "frames": 6,
+   "fps": 3,
+   "mode": "delta",
+   "box": {"x":0,"y":10,"w":480,"h":49}
+  }
+ },
+ "winter-dawn": {
+  "base": "backgrounds/bg-winter-dawn.svg",
+  "tree": "wind",
+  "layers": ["clouds","bird"],
+  "clouds": {
+   "src": "backgrounds/bg-winter-dawn--clouds.svg",
+   "y": 20,
+   "w": 960,
+   "h": 64,
+   "direction": -1,
+   "pxPerSec": 2
+  },
+  "bird": {
+   "src": "backgrounds/bg-winter-dawn--bird.svg",
+   "w": 16,
+   "h": 12,
+   "frames": 3,
+   "fps": 8,
+   "yMin": 16,
+   "yMax": 50,
+   "pxPerFrame": 3,
+   "intervalSec": [10,20]
+  }
+ },
+ "snowy-night": {
+  "base": "backgrounds/bg-snowy-night.svg",
+  "tree": "breeze",
+  "layers": ["meteor"],
+  "meteor": {
+   "src": "backgrounds/bg-snowy-night--meteor.svg",
+   "frames": 5,
+   "fps": 10,
+   "playOnce": true,
+   "box": {"x":274,"y":18,"w":66,"h":33},
+   "intervalSec": [20,45]
+  }
+ },
+ "treePlacement": {
+  "note": "preview only: tree top-left in bg px, scale 3",
+  "slots": [
+   {"x":24,"y":69},
+   {"x":168,"y":69},
+   {"x":312,"y":69}
+  ]
+ }
+}

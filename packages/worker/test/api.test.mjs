@@ -235,15 +235,19 @@ describe('방장 기능', () => {
     const g = open(r.roomId); await g.hello();
     assert.equal((await g.request({ t: 'setVisibility', visibility: 'public' }, 'roomChanged')).code, 'NOT_ALLOWED');
     assert.equal((await owner.request({ t: 'setVisibility', visibility: 'public' }, 'roomChanged')).visibility, 'public');
-    let found = false;
-    for (let i = 0; i < 40 && !found; i++) {
-      const res = await api('GET', '/api/rooms/random-public');
-      assert.equal(res.status, 200);
-      found = res.data.joinCode === r.joinCode;
-    }
-    assert.ok(found, '랜덤 입장 후보에 포함');
+    // 색인에 공개방으로 기록됐는지 확인 (랜덤 추첨 결과에 기대면 방이 쌓일수록 불안정해진다)
+    const auth = { Authorization: 'Bearer local-admin-token' };
+    const listed = (await api('GET', '/api/admin/rooms?status=active', undefined, auth)).data.rooms.find(x => x.room_id === r.roomId);
+    assert.equal(listed?.visibility, 'public', '랜덤 입장 후보(공개방)에 포함');
+    const res = await api('GET', '/api/rooms/random-public');
+    assert.equal(res.status, 200);
+    assert.match(res.data.joinCode, /^[A-HJKMNP-Z2-9]{8}$/);
     const ex = await api('GET', `/api/rooms/random-public?exclude=${r.joinCode}`);
     assert.notEqual(ex.data.joinCode, r.joinCode);
+    // 다시 비공개로 돌리면 후보에서 빠진다
+    await owner.request({ t: 'setVisibility', visibility: 'private' }, 'roomChanged');
+    const back = (await api('GET', '/api/admin/rooms?status=active', undefined, auth)).data.rooms.find(x => x.room_id === r.roomId);
+    assert.equal(back?.visibility, 'private');
   });
 
   it('이름 바꾸기: 검증 후 모두에게 알림', async () => {

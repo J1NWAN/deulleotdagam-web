@@ -12,7 +12,7 @@
     "dev:web": "npm run dev -w @deulleotdagam/web",
     "build": "npm run build -w @deulleotdagam/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test -w @deulleotdagam/shared",
+    "test": "npm run test -w @deulleotdagam/shared && npm run test -w @deulleotdagam/web",
     "test:e2e": "npm run test:e2e -w @deulleotdagam/worker"
   },
   "devDependencies": {

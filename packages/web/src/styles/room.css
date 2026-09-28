@@ -58,26 +58,31 @@
 .conn{position:absolute;top:14px;right:14px;z-index:3;background:var(--ink);color:var(--paper);padding:5px 10px;font-size:.8rem;border:2px solid var(--ink)}
 
 /* ---------- 움직임 ----------
-   나무는 층별 레이어(.t1~.t4)와 그 층의 장식이 같이 좌우로 흔들린다.
-   그림 1픽셀 = 나무 폭의 1/144 (100cqw/144). steps로 픽셀 단위로 끊어 움직여 도트가 뭉개지지 않게 한다. */
-@keyframes sway1{0%,100%{translate:0 0}25%{translate:calc(100cqw/144) 0}50%{translate:0 0}75%{translate:calc(-100cqw/144) 0}}
-@keyframes sway2{0%,100%{translate:0 0}12.5%{translate:calc(100cqw/144) 0}25%{translate:calc(200cqw/144) 0}37.5%{translate:calc(100cqw/144) 0}
-  50%{translate:0 0}62.5%{translate:calc(-100cqw/144) 0}75%{translate:calc(-200cqw/144) 0}87.5%{translate:calc(-100cqw/144) 0}}
-@keyframes sway3{0%,100%{translate:0 0}8.33%{translate:calc(100cqw/144) 0}16.67%{translate:calc(200cqw/144) 0}25%{translate:calc(300cqw/144) 0}
-  33.33%{translate:calc(200cqw/144) 0}41.67%{translate:calc(100cqw/144) 0}50%{translate:0 0}58.33%{translate:calc(-100cqw/144) 0}
-  66.67%{translate:calc(-200cqw/144) 0}75%{translate:calc(-300cqw/144) 0}83.33%{translate:calc(-200cqw/144) 0}91.67%{translate:calc(-100cqw/144) 0}}
-.sw{--lag:0s;animation-duration:var(--sway-dur,5s);animation-timing-function:steps(1,end);animation-iteration-count:infinite;
-  animation-delay:calc(var(--tree-delay,0s) + var(--lag))}
-.t2{--lag:.18s}.t3{--lag:.36s}.t4{--lag:.54s}
-/* 살랑: 꼭대기 2픽셀, 2·3층 1픽셀, 4층은 그대로 */
-.stage[data-wind="1"]{--sway-dur:5.2s}
-.stage[data-wind="1"] .t1{animation-name:sway2}
-.stage[data-wind="1"] .t2,.stage[data-wind="1"] .t3{animation-name:sway1}
-/* 조금 센 바람: 꼭대기 3픽셀, 아래로 갈수록 작게 */
-.stage[data-wind="2"]{--sway-dur:4s}
-.stage[data-wind="2"] .t1{animation-name:sway3}
-.stage[data-wind="2"] .t2{animation-name:sway2}
-.stage[data-wind="2"] .t3,.stage[data-wind="2"] .t4{animation-name:sway1}
+   나무: 바람이 부는 배경에서는 코드가 만든 나무 프레임 이미지(.tree-frame)를 바꿔 끼우고,
+   장식·조명 띠는 같은 높이의 나무 줄만큼 옮긴다 (render/fx.ts TreeWind) */
+.tree-wrap > img.tree-frame{position:absolute;left:0;width:100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
+
+/* 배경 프레임 레이어(불꽃·촛불·연기·오로라·별똥별): 한 번에 한 프레임만 보인다 */
+.fx-f{visibility:hidden}
+.fx-frames:not(.fx-once) .fx-f{animation-duration:var(--dur);animation-timing-function:steps(1,end);animation-iteration-count:infinite}
+.fx-frames.n3 .fx-f{animation-name:fxn3}.fx-frames.n4 .fx-f{animation-name:fxn4}
+.fx-frames.n5 .fx-f{animation-name:fxn5}.fx-frames.n6 .fx-f{animation-name:fxn6}
+@keyframes fxn3{0%{visibility:visible}33.34%,100%{visibility:hidden}}
+@keyframes fxn4{0%{visibility:visible}25%,100%{visibility:hidden}}
+@keyframes fxn5{0%{visibility:visible}20%,100%{visibility:hidden}}
+@keyframes fxn6{0%{visibility:visible}16.67%,100%{visibility:hidden}}
+/* 별똥별처럼 가끔 한 번씩만 보이는 것 */
+.fx-once.play .fx-f{animation:fxn5 var(--dur) steps(1,end) 1}
+/* 구름: 끊김 없는 띠를 1픽셀씩 흘려보냄 */
+.fx-clouds{animation:fx-cloud var(--dur) steps(var(--w)) infinite}
+.fx-clouds.rev{animation-direction:reverse}
+@keyframes fx-cloud{to{transform:translateX(calc(var(--w) * -1px))}}
+/* 새: 화면을 가로질러 날아감 */
+.fx-bird{animation:fx-fly var(--dur) steps(var(--steps)) 1 forwards}
+@keyframes fx-fly{to{transform:translateX(calc(var(--dist) * 1px))}}
+/* 거실 창밖 눈 */
+.fx-wsnow{animation:fx-wsnow var(--dur) steps(var(--h)) infinite}
+@keyframes fx-wsnow{to{transform:translateY(calc(var(--h) * 1px))}}
 
 /* 내리는 눈: 배경 그림 1픽셀 크기(무대를 덮는 배율)에 맞춘 네모 눈송이 */
 .snow{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0;--apx:max(calc(100cqw/480),calc(100cqh/270))}
@@ -85,13 +90,19 @@
 .snow i{position:absolute;top:-3%;display:block;animation:snow-fall var(--dur) linear var(--delay) infinite}
 .snow b{display:block;width:calc(var(--s)*var(--apx));height:calc(var(--s)*var(--apx));background:#f5f8ff;
   animation:snow-sway var(--sway) ease-in-out var(--delay) infinite alternate}
-@keyframes snow-fall{to{translate:0 106cqh}}
+@keyframes snow-fall{to{translate:calc(var(--wdx,0) * var(--apx) * 6) 106cqh}}
+.stage[data-wind="breeze"]{--wdx:4}.stage[data-wind="wind"]{--wdx:10}
 @keyframes snow-sway{from{translate:calc(var(--dx)*var(--apx)*-1) 0}to{translate:calc(var(--dx)*var(--apx)) 0}}
 
-/* 움직임 끄기 · 시스템 "동작 줄이기": 흔들림은 제자리로, 눈은 숨김 */
-.px-paused .sw{animation:none!important}
-.px-paused .snow{display:none}
-@media (prefers-reduced-motion:reduce){ .sw{animation:none!important} .snow{display:none} }
+/* 움직임 끄기 · 시스템 "동작 줄이기": 모든 움직임을 첫 모습에서 멈춤 (나무 바람은 코드에서 멈춤) */
+.px-paused .fx-f,.px-paused .fx-clouds,.px-paused .fx-bird{animation:none!important}
+.px-paused .fx-frames:not(.fx-once) .fx-f.first{visibility:visible}
+.px-paused .snow,.px-paused .fx-wsnow,.px-paused .fx-birds{display:none}
+@media (prefers-reduced-motion:reduce){
+  .fx-f,.fx-clouds,.fx-bird{animation:none!important}
+  .fx-frames:not(.fx-once) .fx-f.first{visibility:visible}
+  .snow,.fx-wsnow,.fx-birds{display:none}
+}
 
 .tip{position:fixed;z-index:30;pointer-events:none;max-width:220px;padding:8px 10px;background:var(--paper);
   border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink);font-size:.88rem;line-height:1.45;word-break:break-word}

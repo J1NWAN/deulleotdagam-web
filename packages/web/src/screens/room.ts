@@ -3,7 +3,9 @@ import {
   type C2S, type Placement, type RoomSnapshot, type S2C, type Slot, type TreeSnapshot,
 } from '@deulleotdagam/shared';
 import { api, ApiFailure, NETWORK_MESSAGE, wsUrl } from '../api';
-import { snowHtml, tierOfUnitY, treeLayersHtml } from '../render/fx';
+import {
+  backgroundLayersSvg, backgroundMotion, snowHtml, startBackgroundTimers, treeAnimatedHtml, treeFrames, treeStaticHtml, TreeWind,
+} from '../render/fx';
 import { backgroundPickerHtml, esc, itemSvg, stringSvg } from '../render/scene';
 import { navigate } from '../router';
 import { openShareDialog } from '../share';
@@ -478,13 +480,13 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     const k = key(tree.id, s.id);
     const p = placementAt(tree.id, s.id);
     const style = `left:${(s.x / 48) * 100}%;top:${((s.y + 4) / 68) * 100}%;width:${(s.size / 48) * 100}%`;
-    // 장식은 자기가 달린 층과 같이 흔들린다
-    const sway = ` sw t${tierOfUnitY(theme, s.y)}`;
+    // data-ty: 바람에 나무가 휠 때 이 높이의 나무 줄과 같은 만큼 장식을 옮긴다
+    const at = `data-slot="${k}" data-ty="${s.y}"`;
     if (p) {
-      return `<button class="slot filled${sway}${isMine(p) ? ' mine' : ''}${fresh ? ' new' : ''}" data-slot="${k}" style="${style}"
+      return `<button class="slot filled${isMine(p) ? ' mine' : ''}${fresh ? ' new' : ''}" ${at} style="${style}"
         aria-label="${esc(tree.name)}: ${esc(iname(p.itemId))}, ${esc(nameOf(p.authorId))}님이 달았어요. 메모 보기">${itemSvg(theme, p.itemId)}</button>`;
     }
-    return `<button class="slot empty${sway}${s.isTop ? ' top' : ''}${pendingPlace.has(k) ? ' pending' : ''}" data-slot="${k}" style="${style}"
+    return `<button class="slot empty${s.isTop ? ' top' : ''}${pendingPlace.has(k) ? ' pending' : ''}" ${at} style="${style}"
       aria-label="${esc(tree.name)}: ${s.isTop ? '꼭대기 빈 자리 (별 전용)' : '빈 자리'}"${readonly ? ' tabindex="-1"' : ''}></button>`;
   }
 
@@ -498,8 +500,8 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     const forest = $('forest');
     const keep = forest.scrollLeft;
     forest.innerHTML = [...snap!.trees].sort((a, b) => a.position - b.position).map(t => `
-      <section class="tree-col${t.scale < 1 ? ' side' : ''}" style="--tree-delay:${-t.position * 1.3}s" aria-label="${esc(t.name)}">
-        <div class="tree-wrap" id="tw-${t.id}">${treeLayersHtml(theme, t)}${t.slots.map(s => slotHtml(t, s)).join('')}</div>
+      <section class="tree-col${t.scale < 1 ? ' side' : ''}" aria-label="${esc(t.name)}">
+        <div class="tree-wrap" id="tw-${t.id}">${treeArtHtml(t)}${t.slots.map(s => slotHtml(t, s)).join('')}</div>
         <div class="plate${snap!.placements.filter(p => p.treeId === t.id).length === t.slots.length ? ' full' : ''}" id="plate-${t.id}">${plateHtml(t)}</div>
       </section>`).join('');
     forest.scrollLeft = keep;
@@ -515,6 +517,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     if (!el || !s) return;
     const hadFocus = document.activeElement === el;
     el.outerHTML = slotHtml(t, s, fresh);
+    wind?.refresh(treeId);
     if (hadFocus) (root.querySelector(`[data-slot="${key(treeId, slotId)}"]`) as HTMLElement | null)?.focus();
     const plate = $('plate-' + treeId);
     plate.innerHTML = plateHtml(t);
@@ -523,35 +526,77 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     markOk();
   }
 
-  /** 배경 그림을 받아 무대 뒤에 깐다. 받기 전이나 실패하면 기본 벽지 무늬가 보인다 */
+  // ---------- 움직임 (배경 레이어, 나무 바람, 눈) ----------
+
+  let wind: TreeWind | null = null;
+  let frameUrls: Map<number, string> | null = null;
+  let stopBgTimers: (() => void) | undefined;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const motionOn = () => store.twinkle.get() && !reduceMotion.matches;
+
+  /** 배경 바탕을 깔고 그 위에 움직이는 레이어(불꽃, 연기, 오로라, 구름 등)를 얹는다 */
   function applyBackground() {
     const id = snap?.background;
     if (!id) return;
-    loadBackground(id).then(bg => {
+    Promise.all([loadBackground(id), backgroundLayersSvg(id).catch(() => '')]).then(([bg, layers]) => {
       const el = $('stageBg');
       if (!el || snap?.background !== id) return;
-      el.innerHTML = `<svg viewBox="${bg.viewBox}" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges">${bg.inner}</svg>`;
+      el.innerHTML = `<svg viewBox="${bg.viewBox}" preserveAspectRatio="xMidYMax slice" shape-rendering="crispEdges">${bg.inner}${layers}</svg>`;
       $('stage').classList.add('has-bg');
+      stopBgTimers?.();
+      stopBgTimers = startBackgroundTimers(el.querySelector('svg')!, () => motionOn() && !document.hidden);
     }).catch(err => console.error(err));
     applyMotion();
   }
 
-  /** 배경에 맞는 움직임: 실내는 가만히, 실외는 바람(나무 흔들림)과 눈 */
+  /** 나무 한 그루: 바람이 부는 배경이면 프레임 이미지, 아니면 정지 그림 */
+  function treeArtHtml(t: TreeSnapshot): string {
+    return frameUrls ? treeAnimatedHtml(theme, t, frameUrls.get(0)!) : treeStaticHtml(theme, t);
+  }
+
+  /** 배경에 맞는 움직임: 실내는 나무가 가만히, 실외는 불규칙한 바람과 눈 */
   function applyMotion() {
-    const fx = theme.backgroundFx[snap?.background ?? ''] ?? { wind: 0, snow: 0 };
     const stage = $('stage');
+    const bgId = snap?.background ?? '';
     if (!stage) return;
-    stage.dataset.wind = String(fx.wind);
-    const snow = snowHtml(fx.snow);
+    const m = backgroundMotion(bgId);
+    stage.dataset.wind = m.wind ?? '';
+    const snow = snowHtml(m.snow);
     $('snowBack').innerHTML = snow.back;
     $('snowFront').innerHTML = snow.front;
+
+    wind?.stop();
+    wind = null;
+    if (!m.wind || !motionOn()) {
+      if (frameUrls) { frameUrls = null; snap!.trees.forEach(t => updateTreeArt(t.id)); }
+      return;
+    }
+    const kind = m.wind;
+    treeFrames(theme, kind).then(urls => {
+      if (!alive || snap?.background !== bgId || !motionOn()) return;
+      frameUrls = urls;
+      snap!.trees.forEach(t => updateTreeArt(t.id));
+      wind = new TreeWind(theme, kind, urls, () => snap!.trees
+        .map(t => ({ id: t.id, position: t.position, el: $('tw-' + t.id) }))
+        .filter(x => x.el));
+      if (!document.hidden) wind.start();
+    }).catch(err => console.error(err));
   }
 
   function updateTreeArt(treeId: string) {
     const wrap = $('tw-' + treeId);
-    wrap?.querySelectorAll(':scope > svg.layer').forEach(el => el.remove());
-    wrap?.insertAdjacentHTML('afterbegin', treeLayersHtml(theme, treeOf(treeId)));
+    if (!wrap) return;
+    wrap.querySelectorAll(':scope > .layer').forEach(el => el.remove());
+    wrap.insertAdjacentHTML('afterbegin', treeArtHtml(treeOf(treeId)));
+    if (!frameUrls) wrap.querySelectorAll<HTMLElement>('.slot').forEach(el => { el.style.translate = ''; });
+    wind?.refresh(treeId);
   }
+
+  // 화면이 가려지면 바람을 멈춰 배터리를 아낀다
+  const onVisibility = () => { if (document.hidden) wind?.stop(); else wind?.start(); };
+  document.addEventListener('visibilitychange', onVisibility);
+  const onReduce = () => applyMotion();
+  reduceMotion.addEventListener('change', onReduce);
 
   function renderProgress() {
     const n = snap!.placements.length, total = totalSlots();
@@ -857,6 +902,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
       store.twinkle.set(!store.twinkle.get());
       document.body.classList.toggle(theme.pausedClass, !store.twinkle.get());
       renderChrome();
+      applyMotion();
     });
     const share = () => openShareDialog(theme, snap!, nameOf);
     on('photoBtn', share);
@@ -873,6 +919,10 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
 
   return () => {
     stop();
+    wind?.stop();
+    stopBgTimers?.();
+    document.removeEventListener('visibilitychange', onVisibility);
+    reduceMotion.removeEventListener('change', onReduce);
     drag?.ghost?.remove();
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onUp);
