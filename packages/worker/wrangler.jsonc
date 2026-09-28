@@ -21,12 +21,8 @@
   "vars": {
     // 쉼표로 구분. 프론트 주소 (직접 도메인을 연결하면 여기에 추가할 것, 비우면 모든 출처 허용)
     "ALLOWED_ORIGINS": "https://deulleotdagam.jinwan.workers.dev",
-    // TODO(open-question #9): IP 해시당 하루 방 생성 5개 (임시안)
-    "CREATE_LIMIT_PER_DAY": "5",
-    // TODO(open-question #7): 서로 다른 신고자 3명이면 비활성 전환 (임시안)
-    "REPORT_THRESHOLD": "3",
-    // TODO(open-question #8): 기본 금칙어에 더할 단어 (쉼표 구분)
-    "BANNED_WORDS": ""
+    // IP 해시당 하루 방 생성 5개 (확정)
+    "CREATE_LIMIT_PER_DAY": "5"
   }
   // 비밀값(대시보드 또는 `wrangler secret put`): IP_SALT(필수), ADMIN_TOKEN(관리자 API용)
 }

@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  accepts, canDelete, checkMemo, checkName, checkTitle, containsBanned,
+  accepts, BANNED_WORDS, canDelete, checkMemo, checkName, checkTitle, containsBanned,
   CODE_ALPHABET, currentSeason, formatKey, hashOwnerKey, isJoinCode, isOwnerKey, isRoomId, isSeasonOver,
-  isValidBackground, isValidItem, isValidString, lastEndedSeason, newJoinCode, newOwnerKey, newRoomId, normalizeCode, PIXEL_THEME, SEASONS,
+  isValidBackground, isValidItem, isValidString, lastEndedSeason, newJoinCode, newOwnerKey, newRoomId, normalizeCode, normalizeForFilter, PIXEL_THEME, SEASONS,
 } from '../src';
 
 const T = PIXEL_THEME;
@@ -49,7 +49,10 @@ describe('텍스트 검증', () => {
   it('금칙어: 흔한 표현은 막지 않는다', () => {
     for (const ok of ['메리 크리스마스!', '보지 마세요', '새끼 고양이 귀여워', '시바견 최고', '꺼내 보자']) expect(containsBanned(ok), ok).toBe(false);
   });
-  it('금칙어: 환경설정으로 추가한 단어', () => {
+  it('금칙어: banned-words.json 목록을 쓰고, 목록을 넘기면 그 목록으로 검사', () => {
+    expect(BANNED_WORDS.length).toBeGreaterThan(10);
+    expect(new Set(BANNED_WORDS).size).toBe(BANNED_WORDS.length);
+    for (const w of BANNED_WORDS) expect(normalizeForFilter(w).length, w).toBeGreaterThan(0);
     expect(containsBanned('바보야', ['바보'])).toBe(true);
   });
   it('장식/조명 id는 테마 목록에 있어야 한다', () => {

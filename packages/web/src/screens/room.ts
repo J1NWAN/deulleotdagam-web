@@ -1,5 +1,5 @@
 import {
-  accepts, canDelete, formatKey, itemName, MEMO_MAX, NAME_MAX, seasonById,
+  accepts, canDelete, checkName, formatKey, itemName, MEMO_MAX, NAME_MAX, seasonById,
   type C2S, type Placement, type RoomSnapshot, type S2C, type Slot, type TreeSnapshot,
 } from '@deulleotdagam/shared';
 import { api, ApiFailure, NETWORK_MESSAGE, wsUrl } from '../api';
@@ -75,12 +75,15 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
       if (!alive) return;
       roomId = j.roomId;
       if (j.joinCode !== source.code) history.replaceState(null, '', `/r/${j.joinCode}`);
-      connect();
+      // 이 방에 처음 오는 참여자는 닉네임부터 정한다 (방장·재방문·지난 시즌 방은 바로 입장)
+      const firstVisit = j.status === 'active' && !store.ownerKey.get(roomId) && !store.guestToken.get(roomId);
+      if (firstVisit) showEntry(j.title);
+      else connect();
     } catch (x) {
       if (!(x instanceof ApiFailure)) throw x;
       if (x.code === 'NOT_FOUND') store.recentRooms.remove(source.code);
       showNotice(x.code === 'DISABLED' ? '잠시 닫아 둔 방이에요' : x.code === 'NOT_FOUND' ? '방을 찾을 수 없어요' : '들어갈 수 없어요',
-        x.code === 'DISABLED' ? '신고가 여러 번 들어와 관리자가 확인하고 있어요.' : x.message);
+        x.code === 'DISABLED' ? '관리자가 확인한 뒤 닫아 둔 방이에요.' : x.message);
     }
   }
 
@@ -90,8 +93,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
     ws = sock;
     sock.onopen = () => {
       // 방장 키는 URL이 아니라 첫 메시지 본문으로 보낸다
-      const hello: C2S = { t: 'hello', guestToken: store.guestToken.get(roomId) ?? undefined, ownerKey: store.ownerKey.get(roomId) ?? undefined };
-      sock.send(JSON.stringify(hello));
+      sendHello(sock);
     };
     sock.onmessage = e => { try { onMessage(JSON.parse(e.data) as S2C); } catch (err) { console.error(err); } };
     sock.onclose = e => {
@@ -99,11 +101,65 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
       ws = null;
       clearInterval(pingTimer);
       if (e.code === 4000) return; // roomDeleted 메시지에서 처리
-      if (e.code === 4003) return showNotice('잠시 닫아 둔 방이에요', '신고가 여러 번 들어와 관리자가 확인하고 있어요.');
+      if (e.code === 4003) return showNotice('잠시 닫아 둔 방이에요', '관리자가 확인한 뒤 닫아 둔 방이에요.');
       if (e.code === 4004) return showNotice('방을 찾을 수 없어요', '방장이 방을 삭제했을 수도 있어요.');
       setConn(true);
       scheduleReconnect();
     };
+  }
+
+  /** 입장 화면에서 정한 닉네임. 처음 들어올 때 한 번만 보낸다 */
+  let entryName: string | undefined;
+  let entryTitle = '';
+
+  function sendHello(sock: WebSocket) {
+    // 방장 키는 URL이 아니라 첫 메시지 본문으로 보낸다
+    const hello: C2S = {
+      t: 'hello',
+      guestToken: store.guestToken.get(roomId) ?? undefined,
+      ownerKey: store.ownerKey.get(roomId) ?? undefined,
+      name: entryName,
+    };
+    sock.send(JSON.stringify(hello));
+  }
+
+  /** 처음 들어오는 참여자의 닉네임 입력 화면. 비워 두고 입장하면 자동 이름 */
+  function showEntry(title: string, error = '') {
+    entryTitle = title;
+    root.innerHTML = `
+      <main class="notice">
+        <form class="card entry" id="entryForm" novalidate>
+          ${itemSvg(theme, 'gingerbread', 'class="icon" aria-hidden="true"')}
+          <h3>${esc(title)}에 들렀어요</h3>
+          <p>장식을 달 때 함께 보일 닉네임을 정해 주세요.<br>비워 두면 자동 이름(예: 눈사람 12)으로 들어가요.</p>
+          <label class="sr-only" for="entryName">닉네임</label>
+          <input type="text" id="entryName" maxlength="${NAME_MAX}" placeholder="닉네임 (${NAME_MAX}자까지, 선택)" autocomplete="nickname" value="${esc(entryName ?? '')}">
+          <p class="field-err" id="entryErr" role="alert">${esc(error)}</p>
+          <div class="row">
+            <a class="pxbtn" href="/" data-link>처음으로</a>
+            <button class="pxbtn primary" type="submit" id="entryOk">입장</button>
+          </div>
+        </form>
+      </main>`;
+    const input = $('entryName') as HTMLInputElement;
+    input.focus();
+    // 한글 조합 중 Enter는 글자 확정용이므로 입장으로 처리하지 않는다
+    input.addEventListener('keydown', e => { if (e.key === 'Enter' && e.isComposing) e.preventDefault(); });
+    $('entryForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const raw = input.value.trim();
+      if (raw) {
+        const c = checkName(raw);
+        if (!c.ok) { $('entryErr').textContent = c.reason === 'TOO_LONG' ? `닉네임은 ${NAME_MAX}자까지 쓸 수 있어요` : '닉네임에 쓸 수 없는 말이 들어 있어요'; return; }
+        entryName = c.value;
+      } else {
+        entryName = undefined;
+      }
+      ($('entryOk') as HTMLButtonElement).disabled = true;
+      // 서버가 닉네임을 거절한 뒤 다시 입장하면 열려 있는 연결로 다시 보낸다
+      if (ws && ws.readyState === WebSocket.OPEN && !snap) sendHello(ws);
+      else connect();
+    });
   }
 
   function scheduleReconnect() {
@@ -210,7 +266,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
         const vis = snap.visibility;
         snap.visibility = m.visibility;
         snap.status = m.status;
-        if (m.status === 'disabled') return showNotice('잠시 닫아 둔 방이에요', '신고가 여러 번 들어와 관리자가 확인하고 있어요.');
+        if (m.status === 'disabled') return showNotice('잠시 닫아 둔 방이에요', '관리자가 확인한 뒤 닫아 둔 방이에요.');
         if (m.status === 'archived' && !readonly) { readonly = true; mount(); toast('시즌이 끝나 이제 구경만 할 수 있어요', 3500); break; }
         renderChrome();
         if (vis !== m.visibility && me?.isOwner)
@@ -228,7 +284,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
       }
       case 'reported':
         closeDialog($('reportDlg'));
-        toast('신고했어요. 여러 사람이 신고한 방은 잠시 닫히고 관리자가 확인해요', 3500);
+        toast('신고했어요. 관리자가 확인할게요', 3000);
         break;
       case 'roomDeleted':
         ws = null;
@@ -250,6 +306,7 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
   }
 
   function onError(code: string, message?: string) {
+    if (code === 'NAME_REJECTED' && !snap) { showEntry(entryTitle, message ?? '쓸 수 없는 닉네임이에요'); return; }
     if (code === 'SLOT_TAKEN' || code === 'INVALID_ITEM' || code === 'INVALID_SLOT' || code === 'MEMO_REJECTED' || code === 'READ_ONLY') {
       // 달던 장식을 되돌림
       for (const k of pendingPlace) { pendingPlace.delete(k); const [t, s] = k.split(':'); updateSlot(t, s); }
@@ -654,8 +711,8 @@ export function roomScreen(root: HTMLElement, source: Source): () => void {
   function openReport(target: string) {
     reportTarget = target;
     $('reportDesc').textContent = target === 'room'
-      ? '이 방에 불쾌한 내용이 있나요? 여러 사람이 신고하면 방이 잠시 닫히고 관리자가 확인해요.'
-      : '이 장식의 메모가 불쾌한가요? 여러 사람이 신고하면 방이 잠시 닫히고 관리자가 확인해요.';
+      ? '이 방에 불쾌한 내용이 있나요? 신고하면 관리자가 확인하고 조치해요.'
+      : '이 장식의 메모가 불쾌한가요? 신고하면 관리자가 확인하고 조치해요.';
     ($('reportInput') as HTMLInputElement).value = '';
     openDialog($('reportDlg'), { focus: $('reportInput') });
   }

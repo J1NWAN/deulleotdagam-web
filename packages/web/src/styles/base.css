@@ -78,6 +78,7 @@ textarea{resize:none;min-height:76px}
   background:repeating-linear-gradient(90deg,var(--wall) 0 22px,var(--wall-line) 22px 26px)}
 .notice .card{text-align:center}
 .notice .card .row{justify-content:center}
+.notice .entry input{text-align:center}
 .notice .icon{width:72px;height:72px;margin:0 auto 10px;display:block}
 
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}

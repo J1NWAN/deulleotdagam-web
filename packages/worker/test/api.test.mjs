@@ -305,12 +305,14 @@ describe('배경', () => {
   });
 });
 
-describe('신고 / 비활성 / 관리자', () => {
-  it('서로 다른 신고자(IP) 3명이 모이면 비활성 → 입장 불가 → 관리자 복구', async () => {
+describe('신고 / 관리자', () => {
+  const auth = { Authorization: 'Bearer local-admin-token' };
+
+  it('신고가 쌓여도 방은 자동으로 닫히지 않고, 관리자 목록에 신고자 수가 올라간다', async () => {
     const r = await createRoom('신고 테스트');
     const owner = open(r.roomId);
     await owner.hello({ ownerKey: r.ownerKey });
-    await owner.request({ t: 'place', treeId: 'A', slotId: 's1', itemId: 'bell', memo: '' }, 'placed');
+    await owner.request({ t: 'place', treeId: 'A', slotId: 's1', itemId: 'bell', memo: '문제의 메모' }, 'placed');
     assert.equal((await owner.request({ t: 'report', target: 'room' }, 'reported')).code, 'NOT_ALLOWED', '방장은 신고 불가');
 
     const sameIp = freshIp();
@@ -320,29 +322,86 @@ describe('신고 / 비활성 / 관리자', () => {
     assert.equal((await g1.request({ t: 'report', target: 'placement:A:s9' }, 'reported')).code, 'BAD_REQUEST', '없는 장식');
     // 같은 IP에서 게스트를 새로 만들어 신고해도 1명으로 센다
     const g1b = open(r.roomId, { ip: sameIp }); await g1b.hello();
-    await g1b.request({ t: 'report', target: 'placement:A:s1' }, 'reported');
+    await g1b.request({ t: 'report', target: 'placement:A:s1', reason: '욕설' }, 'reported');
+    for (let i = 0; i < 3; i++) { const g = open(r.roomId); await g.hello(); await g.request({ t: 'report', target: 'room' }, 'reported'); }
+
+    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200, '신고자 4명이어도 방은 열려 있음');
+    assert.equal(await wsStatus(r.roomId), 101);
+    assert.equal(owner.closed, null, '접속도 끊기지 않음');
+
+    assert.equal((await api('GET', '/api/admin/rooms?reported=1')).status, 401, '토큰 없으면 거부');
+    const list = await api('GET', '/api/admin/rooms?reported=1', undefined, auth);
+    const row = list.data.rooms.find(x => x.room_id === r.roomId);
+    assert.equal(row.report_count, 4);
+    assert.equal(row.status, 'active');
+
+    const detail = await api('GET', `/api/admin/rooms/${r.roomId}/reports`, undefined, auth);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.data.reporterCount, 4);
+    assert.equal(detail.data.reports.length, 5);
+    const onPlacement = detail.data.reports.find(x => x.target === 'placement:A:s1');
+    assert.deepEqual(onPlacement.placement, { itemId: 'bell', itemName: '종', memo: '문제의 메모', authorName: '방장' });
+    assert.equal(onPlacement.reason, '욕설');
+  });
+
+  it('관리자 조치: 닫기 → 입장 불가 · 다시 열기 → 신고 정리 · 신고만 정리 · 삭제', async () => {
+    const r = await createRoom('조치 테스트');
+    const g = open(r.roomId); await g.hello();
+    await g.request({ t: 'report', target: 'room' }, 'reported');
+    const act = action => api('POST', `/api/admin/rooms/${r.roomId}`, { action }, auth);
+
+    const owner = open(r.roomId); await owner.hello({ ownerKey: r.ownerKey });
+    const closed = owner.next(m => m.t === 'roomChanged' && m.status === 'disabled');
+    assert.equal((await act('disable')).status, 200);
+    await closed;
+    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).data.error, 'DISABLED');
+    assert.equal(await wsStatus(r.roomId), 403);
+    assert.ok((await api('GET', '/api/admin/rooms?status=disabled', undefined, auth)).data.rooms.some(x => x.room_id === r.roomId));
+
+    assert.equal((await act('restore')).status, 200);
+    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200);
+    assert.equal((await api('GET', `/api/admin/rooms/${r.roomId}/reports`, undefined, auth)).data.reporterCount, 0, '다시 열면 신고 정리');
+    assert.ok(!(await api('GET', '/api/admin/rooms?reported=1', undefined, auth)).data.rooms.some(x => x.room_id === r.roomId));
+
     const g2 = open(r.roomId); await g2.hello();
     await g2.request({ t: 'report', target: 'room' }, 'reported');
-    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200, '아직 2명');
+    assert.equal((await act('dismiss')).status, 200);
+    assert.equal((await api('GET', `/api/admin/rooms/${r.roomId}/reports`, undefined, auth)).data.reporterCount, 0);
+    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200, '신고만 정리해도 방은 그대로');
 
-    const disabled = owner.next(m => m.t === 'roomChanged' && m.status === 'disabled');
-    const g3 = open(r.roomId); await g3.hello();
-    await g3.request({ t: 'report', target: 'placement:A:s1' }, 'reported');
-    await disabled;
-    const j = await api('GET', `/api/join/${r.joinCode}`);
-    assert.equal(j.status, 403);
-    assert.equal(j.data.error, 'DISABLED');
-    assert.equal(await wsStatus(r.roomId), 403);
+    assert.equal((await act('nope')).status, 400);
+    assert.equal((await act('delete')).status, 200);
+    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 404);
+    assert.equal((await act('delete')).status, 404);
+  });
+});
 
-    const auth = { Authorization: 'Bearer local-admin-token' };
-    assert.equal((await api('GET', '/api/admin/rooms?status=disabled')).status, 401);
-    const list = await api('GET', '/api/admin/rooms?status=disabled', undefined, auth);
-    assert.ok(list.data.rooms.some(x => x.room_id === r.roomId));
-    assert.equal((await api('POST', `/api/admin/rooms/${r.roomId}`, { action: 'restore' }, auth)).status, 200);
-    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200);
-    const again = open(r.roomId); await again.hello();
-    assert.equal((await again.request({ t: 'report', target: 'room' }, 'reported')).t, 'reported', '복구 후 신고 누적 초기화');
-    assert.equal((await api('GET', `/api/join/${r.joinCode}`)).status, 200);
+describe('입장 닉네임', () => {
+  it('처음 들어올 때 정한 닉네임을 쓰고, 비우면 자동 이름', async () => {
+    const r = await createRoom();
+    const named = await open(r.roomId).hello({ name: '  민지  ' });
+    assert.equal(named.me.name, '민지');
+    const auto = await open(r.roomId).hello({ name: '' });
+    assert.match(auto.me.name, /^\S+ \d{1,2}$/, '자동 이름 형식');
+  });
+
+  it('쓸 수 없는 닉네임이면 거절하고, 같은 연결에서 다시 입장할 수 있다', async () => {
+    const r = await createRoom();
+    const c = open(r.roomId);
+    await c.opened;
+    assert.equal((await c.request({ t: 'hello', name: '씨발' }, 'welcome')).code, 'NAME_REJECTED');
+    assert.equal((await c.request({ t: 'hello', name: '가'.repeat(11) }, 'welcome')).code, 'NAME_REJECTED');
+    assert.equal((await c.request({ t: 'place', treeId: 'A', slotId: 's1', itemId: 'bell', memo: '' }, 'placed')).code, 'NOT_READY', '거절되면 입장 전 상태');
+    const w = await c.request({ t: 'hello', name: '도윤' }, 'welcome');
+    assert.equal(w.me.name, '도윤');
+  });
+
+  it('다시 들어오는 참여자는 보낸 닉네임을 무시하고 기존 이름 유지', async () => {
+    const r = await createRoom();
+    const first = await open(r.roomId).hello({ name: '하늘' });
+    const again = await open(r.roomId).hello({ guestToken: first.guestToken, name: '다른이름' });
+    assert.equal(again.me.guestId, first.me.guestId);
+    assert.equal(again.me.name, '하늘');
   });
 });
 

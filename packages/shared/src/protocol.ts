@@ -45,7 +45,8 @@ export interface RoomSnapshot {
 export type ReportTarget = 'room' | `placement:${string}:${string}`;
 
 export type C2S =
-  | { t: 'hello'; guestToken?: string; ownerKey?: string }
+  /** name: 처음 들어오는 참여자가 정한 닉네임 (비우면 자동 이름) */
+  | { t: 'hello'; guestToken?: string; ownerKey?: string; name?: string }
   | { t: 'place'; treeId: string; slotId: string; itemId: string; memo: string }
   | { t: 'remove'; treeId: string; slotId: string }
   | { t: 'setBand'; treeId: string; bandId: string; stringId: string | null }

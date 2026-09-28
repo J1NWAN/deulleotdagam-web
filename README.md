@@ -75,11 +75,30 @@ DB 구조를 바꿨다면 먼저 `npm run db:migrate:remote -w @deulleotdagam/wo
 3. API도 바꾸려면 `deulleotdagam-api`에 `api.deulleotdagam.com` 등을 추가하고 `packages/web/.env.production`의 `VITE_API_BASE`를 바꾼 뒤 화면 다시 배포
 4. `packages/worker/wrangler.jsonc`의 `ALLOWED_ORIGINS`에 새 화면 주소를 쉼표로 추가하고 API 다시 배포 (빠뜨리면 화면에서 API 호출이 막힘)
 
-## 관리자 API (관리자 화면 대신)
+## 금칙어 관리
+
+금칙어는 [`packages/shared/src/banned-words.json`](packages/shared/src/banned-words.json)의 `words` 배열 한 곳에서 관리합니다.
+방 이름, 장식 메모, 닉네임에 적용되며 서버 검증과 화면 미리 확인이 같은 목록을 씁니다.
+
+- 대소문자, 공백, 숫자, 특수문자를 무시하고 비교하므로 `시 1 발`처럼 끼워 넣어도 걸립니다.
+- `보지 마`, `새끼 고양이` 같은 흔한 표현이 막히지 않도록 너무 짧거나 일반적인 단어는 넣지 마세요.
+- 수정 후 `npm test`로 확인하고 **API와 화면을 모두 다시 배포**해야 반영됩니다.
+
+## 관리자 API
+
+신고가 쌓여도 방은 자동으로 닫히지 않습니다. 관리자가 신고 내용을 보고 직접 조치합니다.
+추후 관리자 홈페이지는 이 API를 호출하면 됩니다. 모든 요청에 `Authorization: Bearer $ADMIN_TOKEN`이 필요합니다.
+
+| 요청 | 설명 |
+|---|---|
+| `GET /api/admin/rooms?reported=1` | 신고된 방 목록 (서로 다른 신고자 수 `report_count` 많은 순) |
+| `GET /api/admin/rooms?status=disabled` | 상태별 방 목록 (`active` / `disabled` / `archived`) |
+| `GET /api/admin/rooms/:roomId/reports` | 신고 내용 (사유, 시각, 신고된 장식의 메모·작성자) |
+| `POST /api/admin/rooms/:roomId` `{"action": ...}` | `disable` 방 닫기 · `restore` 다시 열고 신고 정리 · `dismiss` 신고만 정리 · `delete` 영구 삭제 |
 
 ```bash
-# 신고 누적으로 비활성된 방 목록
-curl -H "Authorization: Bearer $ADMIN_TOKEN" https://deulleotdagam-api.jinwan.workers.dev/api/admin/rooms?status=disabled
-# 복구 / 비활성 / 삭제
-curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"action":"restore"}' https://deulleotdagam-api.jinwan.workers.dev/api/admin/rooms/<roomId>
+A=https://deulleotdagam-api.jinwan.workers.dev
+curl -H "Authorization: Bearer $ADMIN_TOKEN" "$A/api/admin/rooms?reported=1"
+curl -H "Authorization: Bearer $ADMIN_TOKEN" "$A/api/admin/rooms/<roomId>/reports"
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -d '{"action":"disable"}' "$A/api/admin/rooms/<roomId>"
 ```

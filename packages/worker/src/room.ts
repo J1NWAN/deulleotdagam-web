@@ -5,7 +5,7 @@ import {
   type C2S, type ErrorCode, type Placement, type RoomSnapshot, type RoomStatus, type S2C, type Slot,
   type TreeSnapshot, type Visibility,
 } from '@deulleotdagam/shared';
-import { autoDeleteAfter, bannedWords, type Env, isQuotaError, now, reportThreshold } from './env';
+import { autoDeleteAfter, type Env, isQuotaError, now } from './env';
 
 export interface InitParams {
   roomId: string;
@@ -18,6 +18,16 @@ export interface InitParams {
   background: string;
 }
 
+export interface AdminReportView {
+  room: { roomId: string; title: string; joinCode: string; status: RoomStatus; visibility: Visibility; createdAt: number };
+  /** 서로 다른 신고자(IP 해시) 수 */
+  reporterCount: number;
+  reports: {
+    target: string; reason: string | null; createdAt: number; reporterGuestId: string;
+    placement: { itemId: string; itemName: string; memo: string; authorName: string } | null;
+  }[];
+}
+
 interface RoomRow {
   id: string; season_id: string; theme_id: string; visibility: Visibility; status: RoomStatus;
   join_code: string; owner_key_hash: string; owner_guest_id: string; title: string; seed: number;
@@ -28,7 +38,7 @@ interface RoomRow {
 /** 소켓마다 hibernation 이후에도 남는 정보 (serializeAttachment) */
 interface Attachment { ready: boolean; guestId?: string; isOwner?: boolean; name?: string; ipHash: string }
 
-const AUTO_DELETE_MIN_PLACEMENTS = 5; // TODO(open-question #4): 방 전체 기준 (임시안)
+const AUTO_DELETE_MIN_PLACEMENTS = 5; // 방 전체 장식 수 기준 (확정)
 const MAX_MESSAGE_BYTES = 2048;
 const RATE = { burst: 20, perSec: 4 };
 
@@ -149,12 +159,56 @@ export class RoomDO extends DurableObject<Env> {
     return 'ok';
   }
 
+  // ---------- 관리자 (관리자 페이지에서 호출할 API의 실제 처리) ----------
+
   async adminSetStatus(status: 'active' | 'disabled'): Promise<boolean> {
     const r = this.room();
     if (!r) return false;
-    await this.setStatus(status);
-    if (status === 'active') this.sql.exec(`DELETE FROM report`); // 복구하면 신고 누적을 초기화
+    if (r.status !== status) await this.setStatus(status);
+    if (status === 'active') await this.adminDismissReports(); // 확인 후 다시 열면 신고 기록을 정리
     return true;
+  }
+
+  /** 신고를 확인했지만 조치가 필요 없을 때: 신고 기록만 지운다 */
+  async adminDismissReports(): Promise<boolean> {
+    if (!this.room()) return false;
+    this.sql.exec(`DELETE FROM report`);
+    await this.syncReportCount();
+    return true;
+  }
+
+  /** 신고 내용 조회: 신고된 장식의 메모와 작성자 이름까지 함께 돌려준다 */
+  async adminReports(): Promise<AdminReportView | null> {
+    const r = this.room();
+    if (!r) return null;
+    const theme = getTheme(r.theme_id);
+    const rows = this.sql.exec<{ target: string; reason: string | null; created_at: number; reporter_guest_id: string; reporter_ip_hash: string }>(
+      `SELECT target, reason, created_at, reporter_guest_id, reporter_ip_hash FROM report ORDER BY created_at DESC LIMIT 200`).toArray();
+    const reports = rows.map(x => {
+      const m = /^placement:([^:]+):([^:]+)$/.exec(x.target);
+      const p = m ? this.sql.exec<{ item_id: string; memo: string; author_guest_id: string }>(
+        `SELECT item_id, memo, author_guest_id FROM placement WHERE tree_id = ? AND slot_id = ?`, m[1], m[2]).toArray()[0] : undefined;
+      return {
+        target: x.target, reason: x.reason, createdAt: x.created_at, reporterGuestId: x.reporter_guest_id,
+        placement: p ? {
+          itemId: p.item_id, itemName: theme.items.find(i => i.id === p.item_id)?.name ?? p.item_id, memo: p.memo,
+          authorName: this.sql.exec<{ display_name: string | null }>(`SELECT display_name FROM guest WHERE guest_id = ?`, p.author_guest_id).toArray()[0]?.display_name ?? '',
+        } : null,
+      };
+    });
+    return {
+      room: { roomId: r.id, title: r.title, joinCode: r.join_code, status: r.status, visibility: r.visibility, createdAt: r.created_at },
+      reporterCount: new Set(rows.map(x => x.reporter_ip_hash)).size,
+      reports,
+    };
+  }
+
+  /** 서로 다른 신고자 수를 색인(D1)에 반영. 값이 바뀔 때만 쓴다 */
+  private async syncReportCount(): Promise<void> {
+    const r = this.room();
+    if (!r) return;
+    const n = this.sql.exec<{ n: number }>(`SELECT COUNT(DISTINCT reporter_ip_hash) AS n FROM report`).one().n;
+    await this.env.DB.prepare(`UPDATE rooms_index SET report_count = ? WHERE room_id = ? AND report_count != ?`).bind(n, r.id, n).run();
   }
 
   async adminDelete(): Promise<boolean> {
@@ -283,7 +337,7 @@ export class RoomDO extends DurableObject<Env> {
         if (!isValidItem(theme, msg.itemId)) return this.fail(ws, 'INVALID_ITEM');
         if (!accepts(slot, msg.itemId, theme))
           return this.fail(ws, 'INVALID_ITEM', slot.isTop ? '꼭대기에는 별만 달 수 있어요' : '별은 꼭대기에만 달 수 있어요');
-        const memo = checkMemo(msg.memo, bannedWords(this.env));
+        const memo = checkMemo(msg.memo);
         if (!memo.ok) return this.fail(ws, 'MEMO_REJECTED', memo.reason === 'TOO_LONG' ? '메모는 40자까지 쓸 수 있어요' : '메모에 쓸 수 없는 말이 들어 있어요');
         // Durable Object는 요청을 하나씩 처리하므로 PK 확인만으로 먼저 온 요청이 이긴다
         if (this.sql.exec(`SELECT 1 FROM placement WHERE tree_id = ? AND slot_id = ?`, msg.treeId, msg.slotId).toArray().length)
@@ -337,7 +391,7 @@ export class RoomDO extends DurableObject<Env> {
         return;
       }
       case 'setName': {
-        const name = checkName(msg.name, bannedWords(this.env));
+        const name = checkName(msg.name);
         if (!name.ok) return this.fail(ws, 'NAME_REJECTED', name.reason === 'TOO_LONG' ? '이름은 10자까지 쓸 수 있어요' : name.reason === 'EMPTY' ? '이름을 입력해 주세요' : '이름에 쓸 수 없는 말이 들어 있어요');
         this.sql.exec(`UPDATE guest SET display_name = ? WHERE guest_id = ?`, name.value, who.guestId);
         // 같은 게스트로 연결된 다른 탭의 소켓도 이름 갱신
@@ -367,9 +421,9 @@ export class RoomDO extends DurableObject<Env> {
         this.sql.exec(`INSERT INTO report (reporter_guest_id, reporter_ip_hash, target, reason, created_at) VALUES (?, ?, ?, ?, ?)`,
           who.guestId, me.ipHash, target, reason, now(this.env));
         this.send(ws, { t: 'reported' });
-        // 게스트를 새로 만들어 혼자 여러 번 신고하는 것을 막기 위해 서로 다른 IP 해시 수로 센다
-        const reporters = this.sql.exec<{ n: number }>(`SELECT COUNT(DISTINCT reporter_ip_hash) AS n FROM report`).one().n;
-        if (reporters >= reportThreshold(this.env)) await this.setStatus('disabled');
+        // 신고가 쌓여도 방을 자동으로 닫지 않는다. 관리자가 신고된 방 목록을 보고 판단한다.
+        // 게스트를 새로 만들어 혼자 여러 번 신고해도 1명으로 보이도록 서로 다른 IP 해시 수를 색인에 기록
+        await this.syncReportCount();
         return;
       }
       default:
@@ -390,8 +444,16 @@ export class RoomDO extends DurableObject<Env> {
       if (row) guestId = row.guest_id;
     }
     if (!guestId) {
+      // 처음 들어온 참여자: 입장 화면에서 정한 닉네임을 쓰고, 비워 두면 자동 이름
+      const wanted = typeof msg.name === 'string' ? msg.name.trim() : '';
+      if (wanted) {
+        const checked = checkName(wanted);
+        if (!checked.ok) return this.fail(ws, 'NAME_REJECTED', checked.reason === 'TOO_LONG' ? '닉네임은 10자까지 쓸 수 있어요' : '닉네임에 쓸 수 없는 말이 들어 있어요');
+        name = checked.value;
+      } else {
+        name = autoName();
+      }
       guestId = newGuestId();
-      name = autoName();
       if (r.status === 'active') {
         // 읽기 전용 방에서는 게스트를 저장하지 않는다 (쓰기 한도 절약)
         issuedToken = newGuestToken();

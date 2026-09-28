@@ -4,7 +4,7 @@ import {
   type ApiError, type ApiErrorCode, type ArchiveResponse, type ArchiveRoom, type CreateRoomResponse, type JoinResponse,
   type RoomStatus, type SeasonInfo, type Visibility,
 } from '@deulleotdagam/shared';
-import { bannedWords, createLimit, type Env, isQuotaError, now } from './env';
+import { createLimit, type Env, isQuotaError, now } from './env';
 
 export { RoomDO } from './room';
 
@@ -73,7 +73,7 @@ async function createRoom(request: Request, env: Env): Promise<Response> {
   const input = await body<{ title: string; visibility: Visibility; background: string }>(request);
   const season = currentSeason(now(env));
   if (!season) throw new HttpError(409, 'NO_SEASON', '지금은 시즌이 쉬는 중이라 방을 만들 수 없어요');
-  const title = checkTitle(input.title ?? season.defaultTitle, bannedWords(env));
+  const title = checkTitle(input.title ?? season.defaultTitle);
   if (!title.ok) throw new HttpError(400, 'TITLE_REJECTED',
     title.reason === 'EMPTY' ? '방 이름을 입력해 주세요' : title.reason === 'TOO_LONG' ? '방 이름은 20자까지 쓸 수 있어요' : '방 이름에 쓸 수 없는 말이 들어 있어요');
   const visibility: Visibility = input.visibility === 'public' ? 'public' : 'private';
@@ -122,7 +122,7 @@ async function joinByCode(code: string, env: Env): Promise<Response> {
   const row = await env.DB.prepare(`SELECT room_id, join_code, title, status, season_id FROM rooms_index WHERE join_code = ?`)
     .bind(c).first<{ room_id: string; join_code: string; title: string; status: RoomStatus; season_id: string }>();
   if (!row) throw new HttpError(404, 'NOT_FOUND', '그런 방을 찾을 수 없어요. 방장이 방을 삭제했을 수도 있어요');
-  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '신고가 여러 번 들어와 잠시 닫아 둔 방이에요');
+  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '관리자가 확인한 뒤 잠시 닫아 둔 방이에요');
   const status: RoomStatus = row.status === 'active' && isSeasonOver(row.season_id, now(env)) ? 'archived' : row.status;
   return json({ roomId: row.room_id, joinCode: row.join_code, title: row.title, status } satisfies JoinResponse);
 }
@@ -134,7 +134,7 @@ async function resumeOwner(request: Request, env: Env): Promise<Response> {
   const row = await env.DB.prepare(`SELECT room_id, join_code, title, status FROM rooms_index WHERE owner_key_hash = ?`)
     .bind(await hashOwnerKey(key)).first<{ room_id: string; join_code: string; title: string; status: RoomStatus }>();
   if (!row) throw new HttpError(404, 'NOT_FOUND', '이 방장 ID로 된 방이 없어요');
-  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '신고가 여러 번 들어와 잠시 닫아 둔 방이에요');
+  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '관리자가 확인한 뒤 잠시 닫아 둔 방이에요');
   return json({ roomId: row.room_id, joinCode: row.join_code, title: row.title, status: row.status } satisfies JoinResponse);
 }
 
@@ -159,7 +159,7 @@ async function randomPublic(url: URL, env: Env): Promise<Response> {
   return json({ joinCode: rows[0].join_code, title: rows[0].title });
 }
 
-// TODO(open-question #3): 시즌이 끝난 뒤에만 지난 시즌에 편입 (임시안)
+// 시즌이 끝난 뒤에만 지난 시즌에 편입 (확정)
 // 비공개방은 참여 코드를 아는 사람끼리의 공간이므로 둘러보기에는 공개방만 노출한다 (사용자 확인 필요)
 async function archive(url: URL, env: Env): Promise<Response> {
   const t = now(env);
@@ -189,30 +189,47 @@ async function openSocket(request: Request, env: Env, roomId: string): Promise<R
   // 없는 roomId로 Durable Object가 만들어지지 않도록 색인에서 먼저 확인
   const row = await env.DB.prepare(`SELECT status FROM rooms_index WHERE room_id = ?`).bind(roomId).first<{ status: RoomStatus }>();
   if (!row) throw new HttpError(404, 'NOT_FOUND', '그런 방을 찾을 수 없어요');
-  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '신고가 여러 번 들어와 잠시 닫아 둔 방이에요');
+  if (row.status === 'disabled') throw new HttpError(403, 'DISABLED', '관리자가 확인한 뒤 잠시 닫아 둔 방이에요');
   const headers = new Headers(request.headers);
   headers.set('X-IP-Hash', await ipHash(request, env));
   return roomStub(env, roomId).fetch(new Request(request, { headers }));
 }
 
-// TODO(open-question #7): 관리자 화면은 없음. 대시보드/스크립트에서 이 API를 호출해 처리 (임시안)
+/**
+ * 관리자 API (추후 관리자 홈페이지에서 호출). `Authorization: Bearer <ADMIN_TOKEN>` 필요.
+ * 신고가 쌓여도 방은 자동으로 닫히지 않으며, 관리자가 아래 API로 확인하고 조치한다.
+ *
+ * GET  /api/admin/rooms?reported=1           신고된 방 (신고자 수 많은 순)
+ * GET  /api/admin/rooms?status=disabled      상태별 방 (active | disabled | archived)
+ * GET  /api/admin/rooms/:roomId/reports      신고 내용 (신고된 장식의 메모 포함)
+ * POST /api/admin/rooms/:roomId {action}     disable: 방 닫기 · restore: 다시 열고 신고 정리
+ *                                            dismiss: 신고만 정리 · delete: 영구 삭제
+ */
 async function admin(request: Request, env: Env, url: URL): Promise<Response> {
   if (!env.ADMIN_TOKEN || request.headers.get('Authorization') !== `Bearer ${env.ADMIN_TOKEN}`) throw new HttpError(401, 'NOT_ALLOWED', 'unauthorized');
+  const cols = `room_id, join_code, title, season_id, visibility, status, is_complete, report_count, created_at`;
   if (request.method === 'GET' && url.pathname === '/api/admin/rooms') {
-    const status = url.searchParams.get('status') ?? 'disabled';
-    const { results } = await env.DB.prepare(`SELECT room_id, join_code, title, season_id, visibility, status, created_at FROM rooms_index WHERE status = ? LIMIT 100`)
-      .bind(status).all();
+    const { results } = url.searchParams.get('reported')
+      ? await env.DB.prepare(`SELECT ${cols} FROM rooms_index WHERE report_count > 0 ORDER BY report_count DESC, created_at DESC LIMIT 100`).all()
+      : await env.DB.prepare(`SELECT ${cols} FROM rooms_index WHERE status = ? ORDER BY created_at DESC LIMIT 100`).bind(url.searchParams.get('status') ?? 'disabled').all();
     return json({ rooms: results });
   }
-  const m = /^\/api\/admin\/rooms\/([0-9a-f]{32})$/.exec(url.pathname);
+  let m = /^\/api\/admin\/rooms\/([0-9a-f]{32})\/reports$/.exec(url.pathname);
+  if (request.method === 'GET' && m) {
+    const view = await roomStub(env, m[1]).adminReports();
+    if (!view) throw new HttpError(404, 'NOT_FOUND', 'room not found');
+    return json(view);
+  }
+  m = /^\/api\/admin\/rooms\/([0-9a-f]{32})$/.exec(url.pathname);
   if (request.method === 'POST' && m) {
-    const { action } = await body<{ action: 'restore' | 'disable' | 'delete' }>(request);
+    const { action } = await body<{ action: string }>(request);
     const stub = roomStub(env, m[1]);
     const ok = action === 'delete' ? await stub.adminDelete()
       : action === 'restore' ? await stub.adminSetStatus('active')
       : action === 'disable' ? await stub.adminSetStatus('disabled')
+      : action === 'dismiss' ? await stub.adminDismissReports()
       : null;
-    if (ok === null) throw new HttpError(400, 'BAD_REQUEST', 'action must be restore | disable | delete');
+    if (ok === null) throw new HttpError(400, 'BAD_REQUEST', 'action must be disable | restore | dismiss | delete');
     if (!ok) throw new HttpError(404, 'NOT_FOUND', 'room not found');
     return json({ ok: true });
   }
